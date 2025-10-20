@@ -126,6 +126,20 @@ jobs:
         env:
           PRODUCTION: "true"
 
+      - name: List build output (debug)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking bin directory ==="
+          if (Test-Path "bin") {
+            Get-ChildItem bin -Recurse | Format-Table Name, Length, FullName
+          } else {
+            Write-Host "bin directory does not exist!"
+          }
+          Write-Host "=== Current directory ==="
+          Get-Location
+          Get-ChildItem . | Format-Table Name
+
       - name: Package Windows NSIS
         if: runner.os == 'Windows' && contains(matrix.formats, 'nsis')
         run: task windows:create:nsis:installer
