@@ -1,3 +1,3 @@
-import { SubmitPaths, ClearConfig } from '../../bindings/github.com/XgzK/intellijapp/internal/service/configservice'
+import { SubmitPaths, ClearConfig, PathExists } from '../../bindings/github.com/XgzK/intellijapp/internal/service/configservice'
 
-export { SubmitPaths, ClearConfig }
+export { SubmitPaths, ClearConfig, PathExists }

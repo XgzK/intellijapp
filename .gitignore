@@ -4,3 +4,10 @@ frontend1/dist
 frontend1/node_modules
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+.idea
+.serena
+frontend/.vscode
+frontend/bindings
+frontend/dist
+frontend/node_modules

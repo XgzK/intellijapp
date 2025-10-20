@@ -77,8 +77,8 @@ func (c *ConfigService) SubmitPaths(projectPath string, configPath string) (stri
 		processedCount++
 	}
 
-	c.logger.Printf("成功处理 %d 个 vmoptions 文件", processedCount)
-	return fmt.Sprintf("配置成功应用到 %d 个文件", processedCount), nil
+	c.logger.Printf("配置成功应用到 %d 个文件, 请重启需要激活编译器输入激活码", processedCount)
+	return fmt.Sprintf("配置成功应用到 %d 个文件, 请重启需要激活编译器输入激活码", processedCount), nil
 }
 
 // ClearConfig removes the added configuration from vmoptions files.
@@ -124,6 +124,23 @@ func (c *ConfigService) ClearConfig(projectPath string) (string, error) {
 
 	c.logger.Printf("成功清除 %d 个 vmoptions 文件的配置", clearedCount)
 	return fmt.Sprintf("成功清除 %d 个文件的配置", clearedCount), nil
+}
+
+// PathExists performs a lightweight existence check for the provided path.
+func (c *ConfigService) PathExists(path string) (bool, error) {
+	cleaned := sanitizePath(path)
+	if cleaned == "" {
+		return false, errors.New("路径不能为空")
+	}
+
+	if _, err := os.Stat(cleaned); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("无法访问路径: %w", err)
+	}
+
+	return true, nil
 }
 
 func sanitizePath(path string) string {
