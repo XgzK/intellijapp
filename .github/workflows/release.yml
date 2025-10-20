@@ -98,24 +98,24 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev nsis rpm
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libglib2.0-dev nsis rpm
 
       - name: Install WebView2 Runtime
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $ProgressPreference = 'SilentlyContinue'
-          $arch = (Get-CimInstance Win32_OperatingSystem).OSArchitecture
-          switch -Regex ($arch) {
-            'ARM64' { $installer = 'MicrosoftEdgeWebView2RuntimeInstallerArm64.exe' }
-            '64'    { $installer = 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe' }
-            default { $installer = 'MicrosoftEdgeWebView2RuntimeInstallerX86.exe' }
-          }
-          $downloadUrl = "https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/latest?filepath=/msedge-blob/edgewebview2/production/$installer"
+          # Windows runners usually have WebView2 pre-installed
+          # If not, download the x64 installer only (skip ARM64 for now)
+          $installer = 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
+          $downloadUrl = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
           $installerPath = Join-Path $env:TEMP $installer
-          Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
-          Start-Process -FilePath $installerPath -ArgumentList '/silent','/install' -NoNewWindow -Wait
-          Remove-Item $installerPath -Force
+          try {
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing -ErrorAction Stop
+            Start-Process -FilePath $installerPath -ArgumentList '/silent','/install' -NoNewWindow -Wait
+            Remove-Item $installerPath -Force
+          } catch {
+            Write-Host "WebView2 may already be installed or download failed. Continuing..."
+          }
 
       - name: Install NSIS (Windows)
         if: runner.os == 'Windows'
