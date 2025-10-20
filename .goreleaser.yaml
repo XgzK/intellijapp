@@ -1,0 +1,95 @@
+# GoReleaser configuration for intellijapp.
+#
+# This configuration focuses on producing compact multi-platform binaries while
+# reusing the existing Wails build pipeline (frontend compilation, bindings,
+# icons, etc.). Hooks are used to mirror the Taskfile steps without copying
+# their logic into the workflow itself, keeping the setup KISS and DRY.
+
+project_name: intellijapp
+
+before:
+  hooks:
+    # Ensure Node dependencies exist before the frontend build.
+    - npm install --prefix frontend
+    # Generate production frontend assets that will be embedded via Go's embed FS.
+    - npm run build --prefix frontend
+    # Refresh Wails bindings to keep Go <-> frontend interfaces in sync.
+    - wails3 generate bindings -f "-tags production" -clean=true -ts
+    # Regenerate platform icons so Windows packaging has the expected assets.
+    - wails3 generate -ts icons -input build/appicon.png -macfilename build/darwin/icons.icns -windowsfilename build/windows/icon.ico
+
+builds:
+  - id: unix
+    main: ./main.go
+    binary: intellijapp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w
+
+  - id: windows
+    main: ./main.go
+    binary: intellijapp
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - production
+    ldflags:
+      - -s -w -H windowsgui
+    hooks:
+      pre:
+        - >
+          wails3 generate syso
+          -arch {{ .Arch }}
+          -icon build/windows/icon.ico
+          -manifest build/windows/wails.exe.manifest
+          -info build/windows/info.json
+          -out wails_windows_{{ .Arch }}.syso
+      post:
+        - rm -f wails_windows_{{ .Arch }}.syso
+
+archives:
+  - id: release-archives
+    builds:
+      - unix
+      - windows
+    # Disable archiving - upload raw binaries directly to GitHub releases
+    format: binary
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if eq .Os "windows" }}.exe{{ end }}'
+
+# Upload additional files from bin/ directory (e.g., installers, extra binaries)
+# This allows including files like intellijapp-amd64-installer.exe alongside the main binary
+extra_files:
+  - glob: ./bin/*-installer.exe  # Windows NSIS installers
+  - glob: ./bin/*.msix           # Windows MSIX packages
+  - glob: ./bin/*.AppImage       # Linux AppImage
+  - glob: ./bin/*.deb            # Debian packages
+  - glob: ./bin/*.rpm            # RedHat packages
+  - glob: ./bin/*.dmg            # macOS disk images
+  - glob: ./bin/*.pkg            # macOS installer packages
+
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+
+changelog:
+  use: git
+  filters:
+    exclude:
+      - '^docs?:'
+      - '^ci:'
+
+release:
+  draft: true

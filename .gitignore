@@ -11,3 +11,8 @@ frontend/.vscode
 frontend/bindings
 frontend/dist
 frontend/node_modules
+
+.vscode
+.claude
+.serena
+.idea
