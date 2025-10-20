@@ -3,11 +3,11 @@ Version=1.0
 Name=My Product
 Comment=My Product Description
 # The Exec line includes %u to pass the URL to the application
-Exec=/usr/local/bin/intellijapp.exe %u
+Exec=/usr/local/bin/intellijapp %u
 Terminal=false
 Type=Application
-Icon=intellijapp.exe
+Icon=intellijapp
 Categories=Utility;
-StartupWMClass=intellijapp.exe
+StartupWMClass=intellijapp
 
  

@@ -3,7 +3,7 @@
 #
 # The lines below are called `modelines`. See `:help modeline`
 
-name: "intellijapp.exe"
+name: "intellijapp"
 arch: ${GOARCH}
 platform: "linux"
 version: "0.1.0"
@@ -17,12 +17,12 @@ license: "MIT"
 release: "1"
 
 contents:
-  - src: "./bin/intellijapp.exe"
-    dst: "/usr/local/bin/intellijapp.exe"
+  - src: "./bin/intellijapp"
+    dst: "/usr/local/bin/intellijapp"
   - src: "./build/appicon.png"
-    dst: "/usr/share/icons/hicolor/128x128/apps/intellijapp.exe.png"
-  - src: "./build/linux/intellijapp.exe.desktop"
-    dst: "/usr/share/applications/intellijapp.exe.desktop"
+    dst: "/usr/share/icons/hicolor/128x128/apps/intellijapp.png"
+  - src: "./build/linux/intellijapp.desktop"
+    dst: "/usr/share/applications/intellijapp.desktop"
 
 # Default dependencies for Debian 12/Ubuntu 22.04+ with WebKit 4.1
 depends:
