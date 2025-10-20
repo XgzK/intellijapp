@@ -53,10 +53,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Windows - NSIS + MSIX
+          # Windows - NSIS only (MSIX not supported in current Wails v3)
           - os: windows-latest
             platform: windows
-            formats: "nsis,msix"
+            formats: "nsis"
           # macOS - .app bundle
           - os: macos-latest
             platform: darwin
@@ -104,7 +104,16 @@ jobs:
             nsis \
             rpm
 
-      - name: Install Wails CLI
+      - name: Install Wails CLI (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          # Set CGO flags to help linker find libraries
+          export CGO_ENABLED=1
+          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+          go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Install Wails CLI (Non-Linux)
+        if: runner.os != 'Linux'
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
       - name: Install Task CLI
@@ -158,10 +167,11 @@ jobs:
         if: runner.os == 'Windows' && contains(matrix.formats, 'nsis')
         run: task windows:create:nsis:installer
 
-      - name: Package Windows MSIX
-        if: runner.os == 'Windows' && contains(matrix.formats, 'msix')
-        run: task windows:create:msix:package
-        continue-on-error: true  # MSIX requires certificates
+      # MSIX packaging disabled - not supported in current Wails v3 version
+      # - name: Package Windows MSIX
+      #   if: runner.os == 'Windows' && contains(matrix.formats, 'msix')
+      #   run: task windows:create:msix:package
+      #   continue-on-error: true  # MSIX requires certificates
 
       - name: Package macOS App
         if: runner.os == 'macOS'
