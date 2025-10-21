@@ -70,17 +70,6 @@ archives:
     format: binary
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if eq .Os "windows" }}.exe{{ end }}'
 
-# Upload additional files from bin/ directory (e.g., installers, extra binaries)
-# This allows including files like intellijapp-amd64-installer.exe alongside the main binary
-extra_files:
-  - glob: ./bin/*-installer.exe  # Windows NSIS installers
-  - glob: ./bin/*.msix           # Windows MSIX packages
-  - glob: ./bin/*.AppImage       # Linux AppImage
-  - glob: ./bin/*.deb            # Debian packages
-  - glob: ./bin/*.rpm            # RedHat packages
-  - glob: ./bin/*.dmg            # macOS disk images
-  - glob: ./bin/*.pkg            # macOS installer packages
-
 checksum:
   name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
 
@@ -93,3 +82,12 @@ changelog:
 
 release:
   draft: true
+  # Upload additional files from bin/ directory (e.g., installers, packages)
+  # This allows including files like intellijapp-amd64-installer.exe alongside the main binary
+  extra_files:
+    - glob: ./bin/*-installer.exe  # Windows NSIS installers
+    - glob: ./bin/*.AppImage       # Linux AppImage
+    - glob: ./bin/*.deb            # Debian packages
+    - glob: ./bin/*.rpm            # RedHat packages
+    - glob: ./bin/*.dmg            # macOS disk images
+    - glob: ./bin/*.pkg            # macOS installer packages
