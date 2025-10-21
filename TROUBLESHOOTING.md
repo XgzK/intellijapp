@@ -18,6 +18,7 @@
 10. [依赖安装顺序问题](#10-依赖安装顺序问题)
 11. [GoReleaser 配置错误](#11-goreleaser-配置错误)
 12. [GoReleaser Before Hooks 重复构建](#12-goreleaser-before-hooks-重复构建)
+13. [GoReleaser Builds 触发 CGO 编译](#13-goreleaser-builds-触发-cgo-编译)
 
 ---
 
@@ -695,6 +696,198 @@ builds:
 
 ---
 
+## 13. GoReleaser Builds 触发 CGO 编译
+
+### 问题描述
+```
+# github.com/wailsapp/wails/v3/internal/operatingsystem
+# [pkg-config --cflags  -- gtk+-3.0 webkit2gtk-4.1]
+Package gtk+-3.0 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `gtk+-3.0.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'gtk+-3.0', required by 'virtual:world', not found
+Package 'webkit2gtk-4.1', required by 'virtual:world', not found
+```
+
+### 原因分析
+
+1. **GoReleaser 的 builds 配置会编译二进制文件**
+   - 即使 package job 已经构建了所有平台的包
+   - GoReleaser 仍会根据 `builds` 配置重新编译
+
+2. **Wails 项目依赖 CGO**
+   - 即使设置 `CGO_ENABLED=0`，Wails 在某些平台仍需要 CGO
+   - Linux 构建需要 GTK3 和 WebKit2GTK 依赖
+
+3. **Release job 环境缺少依赖**
+   - Release job 运行在 ubuntu-latest
+   - 没有安装 Linux 构建所需的系统依赖库
+   - 导致编译失败
+
+### 错误理解 vs 正确理解
+
+**❌ 错误理解（之前的假设）：**
+```
+GoReleaser 的作用：
+1. 下载 package job 的 artifacts
+2. 创建 GitHub Release
+3. 上传预构建的文件
+4. 不会重新编译任何代码
+```
+
+**✅ 正确理解（实际行为）：**
+```
+GoReleaser 的作用：
+1. 如果有 builds 配置，会重新编译所有二进制文件
+2. 根据 archives 配置打包二进制文件
+3. 创建 GitHub Release
+4. 上传编译/打包的文件 + extra_files
+```
+
+### 解决方案
+
+**完全禁用 GoReleaser 的构建功能，仅用于发布管理：**
+
+```yaml
+# GoReleaser configuration for intellijapp.
+#
+# IMPORTANT: This configuration is optimized for CI/CD pipelines where
+# all platform-specific packages are pre-built by the package job.
+# GoReleaser's role is ONLY to create the GitHub release and upload artifacts.
+
+project_name: intellijapp
+
+# Disable builds entirely - all binaries are pre-built by package job
+builds:
+  - skip: true
+
+# Disable archives since we're uploading installer packages directly
+archives:
+  - id: skip-archives
+    format: binary
+
+# Skip checksum generation (optional)
+checksum:
+  disable: true
+
+changelog:
+  use: git
+  filters:
+    exclude:
+      - '^docs?:'
+      - '^ci:'
+
+release:
+  draft: true
+  # Upload all pre-built packages from package job
+  extra_files:
+    - glob: ./bin/*-installer.exe  # Windows NSIS installers
+    - glob: ./bin/*.AppImage       # Linux AppImage
+    - glob: ./bin/*.deb            # Debian packages
+    - glob: ./bin/*.rpm            # RedHat packages
+    - glob: ./bin/*.dmg            # macOS disk images
+    - glob: ./bin/*.pkg            # macOS installer packages
+```
+
+### 架构设计说明
+
+**CI/CD 职责分离：**
+
+```
+┌──────────────────────────────────────────────┐
+│           Package Job (3 platforms)           │
+│  ┌────────────┐ ┌──────────┐ ┌─────────────┐ │
+│  │  Windows   │ │  macOS   │ │    Linux    │ │
+│  │  runner    │ │  runner  │ │   runner    │ │
+│  └─────┬──────┘ └────┬─────┘ └──────┬──────┘ │
+│        │             │               │        │
+│   Build + Package    │          Build + Package
+│        │             │               │        │
+│  ┌─────▼──────┐ ┌───▼──────┐ ┌──────▼──────┐ │
+│  │ .exe       │ │ .app     │ │ .AppImage   │ │
+│  │ -installer │ │ .dmg     │ │ .deb        │ │
+│  │            │ │ .pkg     │ │ .rpm        │ │
+│  └────────────┘ └──────────┘ └─────────────┘ │
+│        │             │               │        │
+│        └─────────────┼───────────────┘        │
+│                      │                        │
+│                 Upload to                     │
+│              GitHub Artifacts                 │
+└──────────────────────┼───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│              Release Job (Linux)              │
+│                                               │
+│  1. Download all artifacts from package job  │
+│  2. Run GoReleaser (NO building, NO hooks)   │
+│     - Create GitHub Release                  │
+│     - Generate changelog                     │
+│     - Upload files via extra_files           │
+│                                               │
+└──────────────────────────────────────────────┘
+```
+
+### 关键要点
+
+1. **GoReleaser 仅用于 Release 管理**
+   - 创建 GitHub Release
+   - 生成 changelog
+   - 上传文件（通过 `extra_files`）
+
+2. **所有构建工作在 Package Job 完成**
+   - 每个平台使用原生 runner
+   - 使用 Task/Wails 工具链构建
+   - 生成平台特定的安装包
+
+3. **避免重复构建**
+   - Package job 已经构建了所有内容
+   - Release job 不应该重新编译
+   - 符合 DRY 原则
+
+### 最佳实践
+
+1. **构建与发布分离**
+   ```yaml
+   # Package job: 专注构建
+   jobs:
+     package:
+       strategy:
+         matrix:
+           os: [windows-latest, macos-latest, ubuntu-latest]
+       steps:
+         - name: Build and Package
+           run: task build && task package
+
+   # Release job: 专注发布
+   jobs:
+     release:
+       steps:
+         - name: Download artifacts
+           uses: actions/download-artifact@v4
+         - name: Create release
+           uses: goreleaser/goreleaser-action@v5
+   ```
+
+2. **GoReleaser 配置最小化**
+   - 禁用不需要的功能（builds, archives, checksums）
+   - 只保留必要的配置（changelog, release, extra_files）
+   - 添加清晰的注释说明设计意图
+
+3. **优势总结**
+   - ✅ **性能：** 避免重复编译，节省 CI/CD 时间
+   - ✅ **可靠：** 使用各平台原生环境构建，兼容性更好
+   - ✅ **简单：** 职责清晰，易于理解和维护
+   - ✅ **灵活：** 可以使用 Wails 专用工具链（Task, wails3 package）
+
+### 相关原则
+- **KISS (简单至上)：** GoReleaser 只做发布，不做构建
+- **DRY (杜绝重复)：** 构建一次，发布一次
+- **单一职责：** Package job 负责构建，Release job 负责发布
+- **关注点分离：** 构建逻辑与发布逻辑完全隔离
+
+---
+
 ### 文档参考
 
 - [Wails v3 文档](https://v3alpha.wails.io/)
@@ -704,9 +897,9 @@ builds:
 
 ---
 
-**文档版本**: 1.1
+**文档版本**: 1.2
 **最后更新**: 2025-10-21
-**问题总数**: 12 个
+**问题总数**: 13 个
 **维护者**: 浮浮酱 🐱
 **适用项目**: Wails v3 多平台桌面应用
 

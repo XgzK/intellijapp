@@ -1,78 +1,30 @@
 # GoReleaser configuration for intellijapp.
 #
-# This configuration focuses on producing compact multi-platform binaries while
-# reusing the existing Wails build pipeline (frontend compilation, bindings,
-# icons, etc.). Hooks are used to mirror the Taskfile steps without copying
-# their logic into the workflow itself, keeping the setup KISS and DRY.
+# IMPORTANT: This configuration is optimized for CI/CD pipelines where
+# all platform-specific packages are pre-built by the package job.
+# GoReleaser's role is ONLY to create the GitHub release and upload artifacts.
+#
+# This approach follows KISS and DRY principles:
+# - KISS: GoReleaser does one thing well (release management)
+# - DRY: No duplicate builds (package job already built everything)
+# - Separation of concerns: Build (package job) vs Release (release job)
 
 project_name: intellijapp
 
-# IMPORTANT: In CI/CD, all packages are pre-built by the package job.
-# GoReleaser only needs to create the GitHub release and upload artifacts.
-# Therefore, before hooks are disabled to avoid rebuilding from scratch.
-#
-# If running GoReleaser locally for development, uncomment these hooks:
-# before:
-#   hooks:
-#     - npm install --prefix frontend
-#     - npm run build --prefix frontend
-#     - wails3 generate bindings -f "-tags production" -clean=true -ts
-#     - wails3 generate -ts icons -input build/appicon.png -macfilename build/darwin/icons.icns -windowsfilename build/windows/icon.ico
-
+# Disable builds entirely - all binaries are pre-built by package job
+# This prevents GoReleaser from trying to compile Go code (which would
+# fail on Linux due to missing CGO dependencies)
 builds:
-  - id: unix
-    main: ./main.go
-    binary: intellijapp
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-    tags:
-      - production
-    ldflags:
-      - -s -w
+  - skip: true
 
-  - id: windows
-    main: ./main.go
-    binary: intellijapp
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    tags:
-      - production
-    ldflags:
-      - -s -w -H windowsgui
-    hooks:
-      pre:
-        - >
-          wails3 generate syso
-          -arch {{ .Arch }}
-          -icon build/windows/icon.ico
-          -manifest build/windows/wails.exe.manifest
-          -info build/windows/info.json
-          -out wails_windows_{{ .Arch }}.syso
-      post:
-        - rm -f wails_windows_{{ .Arch }}.syso
-
+# Disable archives since we're uploading installer packages directly
 archives:
-  - id: release-archives
-    builds:
-      - unix
-      - windows
-    # Disable archiving - upload raw binaries directly to GitHub releases
+  - id: skip-archives
     format: binary
-    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if eq .Os "windows" }}.exe{{ end }}'
 
+# Skip checksum generation for now (can enable later if needed)
 checksum:
-  name_template: '{{ .ProjectName }}_{{ .Version }}_checksums.txt'
+  disable: true
 
 changelog:
   use: git
