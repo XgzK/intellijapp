@@ -19,6 +19,7 @@
 11. [GoReleaser 配置错误](#11-goreleaser-配置错误)
 12. [GoReleaser Before Hooks 重复构建](#12-goreleaser-before-hooks-重复构建)
 13. [GoReleaser Builds 触发 CGO 编译](#13-goreleaser-builds-触发-cgo-编译)
+14. [Test Job 缺少 Linux 依赖](#14-test-job-缺少-linux-依赖)
 
 ---
 
@@ -888,6 +889,188 @@ release:
 
 ---
 
+## 14. Test Job 缺少 Linux 依赖
+
+### 问题描述
+```
+# github.com/wailsapp/wails/v3/internal/operatingsystem
+# [pkg-config --cflags  -- gtk+-3.0 webkit2gtk-4.1]
+Package gtk+-3.0 was not found in the pkg-config search path.
+Perhaps you should add the directory containing `gtk+-3.0.pc'
+to the PKG_CONFIG_PATH environment variable
+Package 'gtk+-3.0', required by 'virtual:world', not found
+Package 'webkit2gtk-4.1', required by 'virtual:world', not found
+```
+
+**错误发生在：** Unit Tests job 的 `Run go test` 步骤
+
+### 原因分析
+
+1. **Test job 运行在 ubuntu-latest**
+   - 需要测试导入了 Wails 包的代码
+   - Wails 依赖 CGO 和 Linux 系统库（GTK3, WebKit2GTK）
+
+2. **Test job 没有安装 Linux 依赖**
+   - 原始设计使用占位符文件来避免真实构建
+   - 但是 `go test ./...` 仍然会编译和导入 Wails 的真实代码
+
+3. **编译测试代码时触发 CGO**
+   - `go test` 需要编译测试文件
+   - 测试文件导入了 Wails 包
+   - Wails 包需要链接 GTK/WebKit 库
+   - 缺少依赖导致编译失败
+
+### 错误理解 vs 正确理解
+
+**❌ 错误理解：**
+```
+Test job 的设计思路：
+- 创建占位符 bindings 和 frontend/dist
+- 这样 go test 就不会尝试编译真实的 Wails 代码
+- 不需要安装 Linux 依赖
+```
+
+**✅ 正确理解：**
+```
+实际情况：
+- 占位符只是避免 embed 指令找不到文件
+- go test 仍然会导入和编译 main.go 等文件
+- main.go 导入了 wails3 包
+- wails3 包依赖 CGO 和系统库
+- 必须安装 Linux 依赖才能编译成功
+```
+
+### 解决方案
+
+**在 test job 中添加 Linux 依赖安装步骤：**
+
+```yaml
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          check-latest: true
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # 添加这一步 - 安装 Linux 依赖
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libglib2.0-dev \
+            libpango1.0-dev \
+            libcairo2-dev \
+            libgdk-pixbuf-2.0-dev \
+            libsoup-3.0-dev \
+            libharfbuzz-dev \
+            libatk1.0-dev
+
+      - name: Install frontend dependencies
+        run: npm install --prefix frontend
+
+      - name: Create placeholder bindings (for compilation)
+        run: |
+          mkdir -p frontend/bindings/github.com/XgzK/intellijapp/internal/service
+          echo "// Placeholder for CI testing" > frontend/bindings/github.com/XgzK/intellijapp/internal/service/index.ts
+
+      - name: Create placeholder frontend dist (for embed)
+        run: |
+          mkdir -p frontend/dist
+          echo "<!DOCTYPE html><html><body>Test</body></html>" > frontend/dist/index.html
+
+      - name: Run go test
+        run: go test ./...
+```
+
+### 关键理解
+
+1. **占位符的作用有限**
+   - 占位符只能避免 `embed` 指令报错
+   - 无法避免 `import` 语句触发的依赖编译
+
+2. **go test 的编译行为**
+   - `go test ./...` 会编译所有测试包
+   - 编译过程会递归处理所有 import
+   - Wails 包的 import 会触发 CGO 编译
+
+3. **Test 环境需要与 Build 环境一致**
+   - Test job 需要安装与 Package job 相同的依赖
+   - 这样才能确保测试环境的真实性
+
+### 最佳实践
+
+1. **统一依赖安装**
+   ```yaml
+   # 可以考虑创建可复用的 action
+   # .github/actions/setup-linux-deps/action.yml
+   - name: Install Linux Dependencies
+     uses: ./.github/actions/setup-linux-deps
+   ```
+
+2. **环境一致性**
+   - Test job 应该使用与实际构建相同的环境
+   - 避免"测试通过但构建失败"的情况
+
+3. **依赖清单文档**
+   - 在 README 或文档中列出所有系统依赖
+   - 便于本地开发环境配置
+
+### 替代方案
+
+如果不想在 test job 中安装完整的 Linux 依赖，可以考虑：
+
+**方案 B：跳过需要 CGO 的测试**
+```yaml
+- name: Run go test
+  run: go test -tags=!cgo ./...
+  env:
+    CGO_ENABLED: 0
+```
+
+**方案 C：只在 package job 中运行测试**
+```yaml
+# 移除独立的 test job
+# 在 package job 的构建前运行测试
+- name: Run tests
+  run: go test ./...
+- name: Build Application
+  run: task build
+```
+
+但这些方案都有缺点：
+- 方案 B：无法测试完整功能
+- 方案 C：测试失败会浪费多平台构建资源
+
+因此推荐 **方案 A（当前方案）**：在 test job 中安装依赖
+
+### 相关原则
+- **环境一致性：** 测试环境应该尽可能接近生产环境
+- **快速失败：** Test job 先运行，尽早发现问题
+- **DRY：** 可以考虑提取依赖安装步骤为可复用 action
+
+---
+
 ### 文档参考
 
 - [Wails v3 文档](https://v3alpha.wails.io/)
@@ -897,9 +1080,9 @@ release:
 
 ---
 
-**文档版本**: 1.2
+**文档版本**: 1.3
 **最后更新**: 2025-10-21
-**问题总数**: 13 个
+**问题总数**: 14 个
 **维护者**: 浮浮酱 🐱
 **适用项目**: Wails v3 多平台桌面应用
 
