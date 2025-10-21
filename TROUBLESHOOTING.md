@@ -16,6 +16,8 @@
 8. [Linux 打包文件扩展名错误](#8-linux-打包文件扩展名错误)
 9. [MSIX 打包命令不支持](#9-msix-打包命令不支持)
 10. [依赖安装顺序问题](#10-依赖安装顺序问题)
+11. [GoReleaser 配置错误](#11-goreleaser-配置错误)
+12. [GoReleaser Before Hooks 重复构建](#12-goreleaser-before-hooks-重复构建)
 
 ---
 
@@ -532,6 +534,167 @@ ls -la frontend/dist/
 ls -la frontend/bindings/
 ```
 
+---
+
+## 11. GoReleaser 配置错误
+
+### 问题描述
+```
+yaml: unmarshal errors:
+  line 75: field extra_files not found in type config.Project
+```
+
+### 原因分析
+- GoReleaser 配置文件结构不正确
+- `extra_files` 字段被放在了顶层，而非 `release` 节点下
+- GoReleaser v1.26+ 要求 `extra_files` 必须是 `release` 配置的子项
+
+### 解决方案
+
+**错误的配置：**
+```yaml
+archives:
+  - format: binary
+
+# ❌ 错误：extra_files 在顶层
+extra_files:
+  - glob: ./bin/*-installer.exe
+
+release:
+  draft: true
+```
+
+**正确的配置：**
+```yaml
+archives:
+  - format: binary
+
+release:
+  draft: true
+  # ✅ 正确：extra_files 在 release 节点下
+  extra_files:
+    - glob: ./bin/*-installer.exe
+    - glob: ./bin/*.AppImage
+    - glob: ./bin/*.deb
+    - glob: ./bin/*.rpm
+    - glob: ./bin/*.dmg
+    - glob: ./bin/*.pkg
+```
+
+### 最佳实践
+1. 参考最新的 GoReleaser 官方文档：https://goreleaser.com/customization/release/
+2. 使用 `goreleaser check` 命令验证配置文件语法
+3. 注意 GoReleaser 版本升级可能带来的配置变更
+
+---
+
+## 12. GoReleaser Before Hooks 重复构建
+
+### 问题描述
+```
+Run goreleaser/goreleaser-action@v5
+  building       binaries=0 builds=2
+  running        before hooks
+error=hook failed: shell: 'npm run build --prefix frontend': exit status 127:
+sh: 1: vue-tsc: not found
+Error: The process '/opt/hostedtoolcache/goreleaser-action/1.26.2/x64/goreleaser' failed with exit code 1
+```
+
+### 原因分析
+1. **GoReleaser 运行在 release job 中**
+   - release job 只负责从 package job 下载已构建的包
+   - release job 不需要重新构建前端或生成绑定
+
+2. **before hooks 设计用于本地开发**
+   - 本地运行 `goreleaser release` 时需要从源代码构建
+   - CI/CD 中 package job 已经完成了所有构建工作
+
+3. **Node 依赖未安装**
+   - release job 只安装了 Go 和 Node 环境
+   - 未执行 `npm install`，导致 `vue-tsc` 找不到
+
+### 解决方案
+
+**修改 `.goreleaser.yaml`，禁用 before hooks：**
+
+```yaml
+project_name: intellijapp
+
+# IMPORTANT: In CI/CD, all packages are pre-built by the package job.
+# GoReleaser only needs to create the GitHub release and upload artifacts.
+# Therefore, before hooks are disabled to avoid rebuilding from scratch.
+#
+# If running GoReleaser locally for development, uncomment these hooks:
+# before:
+#   hooks:
+#     - npm install --prefix frontend
+#     - npm run build --prefix frontend
+#     - wails3 generate bindings -f "-tags production" -clean=true -ts
+#     - wails3 generate -ts icons -input build/appicon.png -macfilename build/darwin/icons.icns -windowsfilename build/windows/icon.ico
+
+builds:
+  - id: unix
+    # ... rest of config
+```
+
+### CI/CD 流程说明
+
+**完整的 CI/CD 流程：**
+
+```
+┌─────────────────┐
+│   test job      │ ← 运行单元测试（使用占位符）
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  package job    │ ← 完整构建（前端 + 绑定 + 打包）
+│  (3 platforms)  │   - npm install & build
+└────────┬────────┘   - wails3 generate bindings
+         │            - task package
+         │            生成所有平台的安装包
+         ▼
+┌─────────────────┐
+│  release job    │ ← 仅创建 GitHub Release
+│  (downloads)    │   - 下载所有 artifacts
+└─────────────────┘   - 运行 GoReleaser（无需构建）
+                      - 上传到 GitHub Releases
+```
+
+### 关键理解
+- **package job 的输出：** bin/ 目录中的所有安装包（.exe, .AppImage, .deb, .rpm, .dmg, .pkg）
+- **release job 的职责：** 仅收集和发布，不重新构建
+- **GoReleaser 的角色：** 创建 release、生成 changelog、上传 artifacts
+
+### 最佳实践
+
+1. **分离构建和发布逻辑**
+   ```yaml
+   # package job: 负责构建
+   - name: Build Application
+     run: task build
+
+   # release job: 负责发布
+   - name: Release with GoReleaser
+     uses: goreleaser/goreleaser-action@v5
+   ```
+
+2. **本地开发时的用法**
+   - 取消注释 `.goreleaser.yaml` 中的 before hooks
+   - 运行 `goreleaser release --snapshot --clean` 进行本地测试
+
+3. **CI/CD 中的用法**
+   - 保持 before hooks 禁用
+   - 确保 package job 生成所有需要的文件
+   - 使用 `extra_files` 上传 package job 的输出
+
+### 相关原则
+- **KISS (简单至上)：** 每个 job 只做一件事
+- **DRY (杜绝重复)：** 不在 release job 中重复 package job 的工作
+- **YAGNI (精益求精)：** GoReleaser 只负责发布，不负责构建
+
+---
+
 ### 文档参考
 
 - [Wails v3 文档](https://v3alpha.wails.io/)
@@ -541,8 +704,9 @@ ls -la frontend/bindings/
 
 ---
 
-**文档版本**: 1.0
+**文档版本**: 1.1
 **最后更新**: 2025-10-21
+**问题总数**: 12 个
 **维护者**: 浮浮酱 🐱
 **适用项目**: Wails v3 多平台桌面应用
 

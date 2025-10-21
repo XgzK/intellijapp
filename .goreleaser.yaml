@@ -7,16 +7,17 @@
 
 project_name: intellijapp
 
-before:
-  hooks:
-    # Ensure Node dependencies exist before the frontend build.
-    - npm install --prefix frontend
-    # Generate production frontend assets that will be embedded via Go's embed FS.
-    - npm run build --prefix frontend
-    # Refresh Wails bindings to keep Go <-> frontend interfaces in sync.
-    - wails3 generate bindings -f "-tags production" -clean=true -ts
-    # Regenerate platform icons so Windows packaging has the expected assets.
-    - wails3 generate -ts icons -input build/appicon.png -macfilename build/darwin/icons.icns -windowsfilename build/windows/icon.ico
+# IMPORTANT: In CI/CD, all packages are pre-built by the package job.
+# GoReleaser only needs to create the GitHub release and upload artifacts.
+# Therefore, before hooks are disabled to avoid rebuilding from scratch.
+#
+# If running GoReleaser locally for development, uncomment these hooks:
+# before:
+#   hooks:
+#     - npm install --prefix frontend
+#     - npm run build --prefix frontend
+#     - wails3 generate bindings -f "-tags production" -clean=true -ts
+#     - wails3 generate -ts icons -input build/appicon.png -macfilename build/darwin/icons.icns -windowsfilename build/windows/icon.ico
 
 builds:
   - id: unix
