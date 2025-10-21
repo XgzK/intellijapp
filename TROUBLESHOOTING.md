@@ -20,6 +20,7 @@
 12. [GoReleaser Before Hooks 重复构建](#12-goreleaser-before-hooks-重复构建)
 13. [GoReleaser Builds 触发 CGO 编译](#13-goreleaser-builds-触发-cgo-编译)
 14. [Test Job 缺少 Linux 依赖](#14-test-job-缺少-linux-依赖)
+15. [GoReleaser Skip Builds 不上传文件](#15-goreleaser-skip-builds-不上传文件)
 
 ---
 
@@ -1068,6 +1069,165 @@ jobs:
 - **环境一致性：** 测试环境应该尽可能接近生产环境
 - **快速失败：** Test job 先运行，尽早发现问题
 - **DRY：** 可以考虑提取依赖安装步骤为可复用 action
+
+---
+
+## 15. GoReleaser Skip Builds 不上传文件
+
+### 问题描述
+
+Release 页面只有源代码压缩包（Source code.zip 和 Source code.tar.gz），**没有安装包文件**（.exe, .AppImage, .deb, .rpm, .dmg, .pkg）。
+
+但是 GitHub Actions 的 Artifacts 中确实有这些文件：
+- packages-windows (9.14 MB)
+- packages-darwin (6.81 MB)
+- packages-linux (85.9 MB)
+
+### 原因分析
+
+1. **GoReleaser 的 builds: skip 限制**
+   - 当设置 `builds: skip: true` 时，GoReleaser 认为没有构建产物
+   - 即使配置了 `extra_files`，也不会上传这些文件
+   - 这是 GoReleaser 的设计限制
+
+2. **Release Job 流程**
+   ```
+   ✅ Download artifacts → bin/
+   ✅ List files (确认文件存在)
+   ✅ Run GoReleaser (执行成功)
+   ❌ Upload files (没有上传！)
+   ```
+
+3. **GoReleaser 配置无效**
+   ```yaml
+   builds:
+     - skip: true  # ❌ 导致整个 release 流程被跳过
+
+   release:
+     extra_files:
+       - glob: ./bin/*.exe  # ⚠️  配置了但不会生效
+   ```
+
+### 解决方案
+
+**方案 A：替换 GoReleaser 为 GitHub CLI** ⭐ 推荐
+
+完全移除 GoReleaser，直接使用 `gh` CLI 上传文件：
+
+```yaml
+- name: Create GitHub Release
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  run: |
+    # Extract tag name
+    TAG_NAME=${GITHUB_REF#refs/tags/}
+
+    # Create release with changelog
+    gh release create "$TAG_NAME" \
+      --draft \
+      --title "Release $TAG_NAME" \
+      --notes "See [CHANGELOG](https://github.com/${{ github.repository }}/compare/v1.0.1...$TAG_NAME) for details." \
+      ./bin/*-installer.exe \
+      ./bin/*.AppImage \
+      ./bin/*.deb \
+      ./bin/*.rpm \
+      ./bin/*.dmg \
+      ./bin/*.pkg \
+      2>/dev/null || true
+
+    # If release already exists, upload files to it
+    if [ $? -ne 0 ]; then
+      echo "Release already exists, uploading files..."
+      gh release upload "$TAG_NAME" \
+        ./bin/*-installer.exe \
+        ./bin/*.AppImage \
+        ./bin/*.deb \
+        ./bin/*.rpm \
+        ./bin/*.dmg \
+        ./bin/*.pkg \
+        --clobber
+    fi
+```
+
+**方案 A 的优点：**
+- ✅ 简单直接，易于理解和维护
+- ✅ 完全控制上传哪些文件
+- ✅ 没有 GoReleaser 的配置限制
+- ✅ 支持文件覆盖（`--clobber`）
+- ✅ 支持 release 已存在的情况
+
+**方案 A 的缺点：**
+- ❌ 需要手动生成 changelog
+- ❌ 失去 GoReleaser 的一些高级功能（checksums等）
+
+**方案 B：修复 GoReleaser 配置** (不推荐)
+
+尝试创建"虚拟" build，但可能遇到其他问题：
+
+```yaml
+builds:
+  - id: dummy
+    skip: true  # 仍然可能不工作
+```
+
+### 关键理解
+
+1. **GoReleaser 的设计哲学**
+   - GoReleaser 是为"从源代码构建并发布"设计的
+   - 不适合"只发布预构建文件"的场景
+   - `extra_files` 是补充功能，不是主要功能
+
+2. **CI/CD 职责分离的正确方式**
+   ```
+   Package Job: 构建所有平台的安装包
+         ↓
+   Release Job: 上传这些预构建的安装包
+         ↓
+   工具选择: GitHub CLI 比 GoReleaser 更适合
+   ```
+
+3. **简单性原则 (KISS)**
+   - 不需要复杂的工具来做简单的事
+   - `gh release create` + file globs = 完成任务
+   - 避免为了使用工具而扭曲配置
+
+### 最佳实践
+
+1. **工具选择原则**
+   - 如果从源代码构建 → 使用 GoReleaser
+   - 如果只上传预构建文件 → 使用 GitHub CLI
+   - 不要强行使用不适合场景的工具
+
+2. **GitHub CLI 上传技巧**
+   ```bash
+   # 使用 glob 模式批量上传
+   gh release upload v1.0.0 ./bin/*.{exe,AppImage,deb,rpm,dmg,pkg}
+
+   # 覆盖已存在的文件
+   gh release upload v1.0.0 file.exe --clobber
+
+   # 创建 draft release
+   gh release create v1.0.0 --draft --notes "Release notes"
+   ```
+
+3. **Changelog 生成**
+   ```bash
+   # 简单的 changelog
+   --notes "See [CHANGELOG](https://github.com/user/repo/compare/v1.0.0...v1.0.1)"
+
+   # 或使用 git log 生成
+   --notes "$(git log --oneline v1.0.0..v1.0.1)"
+   ```
+
+### 文件清理
+
+移除 GoReleaser 后，可以删除：
+- `.goreleaser.yaml` - 不再需要的配置文件
+
+### 相关原则
+- **KISS (简单至上)：** 使用最简单的工具完成任务
+- **工具适配性：** 选择适合场景的工具，而不是强行适配
+- **职责清晰：** Package job 构建，Release job 上传
 
 ---
 

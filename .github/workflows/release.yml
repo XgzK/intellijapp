@@ -274,10 +274,35 @@ jobs:
           echo "=== Downloaded Packages ==="
           ls -lhR bin/
 
-      - name: Release with GoReleaser
-        uses: goreleaser/goreleaser-action@v5
-        with:
-          version: latest
-          args: release --clean
+      - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract tag name
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+
+          # Create release with changelog
+          gh release create "$TAG_NAME" \
+            --draft \
+            --title "Release $TAG_NAME" \
+            --notes "See [CHANGELOG](https://github.com/${{ github.repository }}/compare/v1.0.1...$TAG_NAME) for details." \
+            ./bin/*-installer.exe \
+            ./bin/*.AppImage \
+            ./bin/*.deb \
+            ./bin/*.rpm \
+            ./bin/*.dmg \
+            ./bin/*.pkg \
+            2>/dev/null || true
+
+          # If release already exists, upload files to it
+          if [ $? -ne 0 ]; then
+            echo "Release already exists, uploading files..."
+            gh release upload "$TAG_NAME" \
+              ./bin/*-installer.exe \
+              ./bin/*.AppImage \
+              ./bin/*.deb \
+              ./bin/*.rpm \
+              ./bin/*.dmg \
+              ./bin/*.pkg \
+              --clobber
+          fi
