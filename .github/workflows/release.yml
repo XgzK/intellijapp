@@ -190,9 +190,37 @@ jobs:
       #   run: task windows:create:msix:package
       #   continue-on-error: true  # MSIX requires certificates
 
+      - name: Rename Windows packages
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Extract version from tag (e.g., v1.0.2 -> 1.0.2)
+          $VERSION = $env:GITHUB_REF -replace '^refs/tags/v', ''
+
+          # Rename files with standardized naming
+          if (Test-Path "bin\intellijapp-amd64-installer.exe") {
+            Rename-Item "bin\intellijapp-amd64-installer.exe" "intellijapp-${VERSION}-windows-amd64-installer.exe"
+          }
+          if (Test-Path "bin\intellijapp.exe") {
+            Rename-Item "bin\intellijapp.exe" "intellijapp-${VERSION}-windows-amd64.exe"
+          }
+
       - name: Package macOS App
         if: runner.os == 'macOS'
         run: task package
+
+      - name: Rename macOS packages
+        if: runner.os == 'macOS'
+        run: |
+          # Extract version from tag (e.g., v1.0.2 -> 1.0.2)
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # For macOS, we keep the .app directory structure but can zip it
+          if [ -d "bin/intellijapp.app" ]; then
+            cd bin
+            zip -r "intellijapp-${VERSION}-darwin-universal.app.zip" intellijapp.app
+            cd ..
+          fi
 
       - name: Package Linux AppImage
         if: runner.os == 'Linux' && contains(matrix.formats, 'appimage')
@@ -208,6 +236,18 @@ jobs:
         if: runner.os == 'Linux' && contains(matrix.formats, 'rpm')
         run: task linux:create:rpm
         continue-on-error: true
+
+      - name: Rename Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          # Extract version from tag (e.g., v1.0.2 -> 1.0.2)
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Rename files with standardized naming
+          [ -f "bin/intellijapp-x86_64.AppImage" ] && mv "bin/intellijapp-x86_64.AppImage" "bin/intellijapp-${VERSION}-linux-amd64.AppImage"
+          [ -f "bin/intellijapp.deb" ] && mv "bin/intellijapp.deb" "bin/intellijapp-${VERSION}-linux-amd64.deb"
+          [ -f "bin/intellijapp.rpm" ] && mv "bin/intellijapp.rpm" "bin/intellijapp-${VERSION}-linux-amd64.rpm"
+          [ -f "bin/intellijapp" ] && mv "bin/intellijapp" "bin/intellijapp-${VERSION}-linux-amd64"
 
       - name: Upload Package Artifacts
         if: success()
