@@ -281,15 +281,8 @@ jobs:
           # Extract tag name
           TAG_NAME=${GITHUB_REF#refs/tags/}
 
-          # Find all package files (using find to avoid glob expansion issues)
-          PACKAGES=$(find ./bin -type f \( \
-            -name "*-installer.exe" -o \
-            -name "*.AppImage" -o \
-            -name "*.deb" -o \
-            -name "*.rpm" -o \
-            -name "*.dmg" -o \
-            -name "*.pkg" \
-          \) | tr '\n' ' ')
+          # Find all files in bin directory
+          PACKAGES=$(find ./bin -type f | tr '\n' ' ')
 
           echo "Found packages: $PACKAGES"
 
