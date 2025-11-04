@@ -303,7 +303,7 @@ const openExternal = async (url: string) => {
             </div>
             <div class="meta-row">
               <span class="meta-label">当前版本</span>
-              <span class="meta-value">v1.0.0</span>
+              <span class="meta-value">v1.0.2</span>
             </div>
             <div class="meta-row meta-row--link">
               <span class="meta-label">构建工具</span>
