@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { SubmitPaths, ClearConfig, PathExists } from '@/services/configService'
+import { ref, onMounted } from 'vue'
+import { SubmitPaths, ClearConfig, PathExists, GetAboutInfo } from '@/services/configService'
+import { AboutInfo } from '../bindings/github.com/XgzK/intellijapp/internal/service/models'
 import { Window, Browser } from '@wailsio/runtime'
 
 const appWindow = Window
@@ -12,7 +13,8 @@ const statusMessage = ref('')
 const submitting = ref(false)
 const clearing = ref(false)
 const isError = ref(false)
-const CONFIG_PATH_PATTERN = /^[A-Za-z0-9:\\/]+$/
+const CONFIG_PATH_PATTERN = /^[A-Za-z0-9:\\/\s_\-.]+$/
+const aboutInfo = ref<AboutInfo>(new AboutInfo())
 
 const extractErrorMessage = (error: unknown): string => {
   const parse = (value: string) => {
@@ -69,7 +71,7 @@ const handleSubmit = async () => {
   }
 
   if (!CONFIG_PATH_PATTERN.test(configPath.value)) {
-    statusMessage.value = '配置目录仅支持字母、数字及:/\\ 字符，其它内容不支持喵～'
+    statusMessage.value = '配置目录路径包含不支持的特殊字符喵～'
     isError.value = true
     return
   }
@@ -169,6 +171,15 @@ const openExternal = async (url: string) => {
     console.error('打开外部链接失败', url, error)
   }
 }
+
+// 组件挂载时获取关于信息
+onMounted(async () => {
+  try {
+    aboutInfo.value = await GetAboutInfo()
+  } catch (error) {
+    console.error('获取关于信息失败', error)
+  }
+})
 
 </script>
 
@@ -299,11 +310,11 @@ const openExternal = async (url: string) => {
           <div class="meta-list">
             <div class="meta-row">
               <span class="meta-label">应用名称</span>
-              <span class="meta-value">IntelliJ 配置助手</span>
+              <span class="meta-value">{{ aboutInfo.appName }}</span>
             </div>
             <div class="meta-row">
               <span class="meta-label">当前版本</span>
-              <span class="meta-value">v1.0.2</span>
+              <span class="meta-value">{{ aboutInfo.version }}</span>
             </div>
             <div class="meta-row meta-row--link">
               <span class="meta-label">构建工具</span>
@@ -314,7 +325,7 @@ const openExternal = async (url: string) => {
                 class="meta-link"
                 @click.prevent="openExternal('https://github.com/wailsapp/wails')"
               >
-                Wails 3
+                Wails {{ aboutInfo.wailsVersion }}
               </a>
             </div>
           </div>
@@ -331,15 +342,15 @@ const openExternal = async (url: string) => {
             <div class="meta-list">
               <div class="meta-row">
                 <span class="meta-label">前端框架</span>
-                <span class="meta-value">Vue 3.5.22</span>
+                <span class="meta-value">Vue {{ aboutInfo.vueVersion }}</span>
               </div>
               <div class="meta-row">
                 <span class="meta-label">后端语言</span>
-                <span class="meta-value">Go 1.25.3</span>
+                <span class="meta-value">{{ aboutInfo.goVersion }}</span>
               </div>
               <div class="meta-row">
                 <span class="meta-label">构建工具</span>
-                <span class="meta-value">Wails 3</span>
+                <span class="meta-value">Wails {{ aboutInfo.wailsVersion }}</span>
               </div>
             </div>
           </div>
@@ -355,47 +366,30 @@ const openExternal = async (url: string) => {
               <div class="meta-row meta-row--link">
                 <span class="meta-label">仓库地址</span>
                 <a
-                  href="https://github.com/XgzK/intellijapp"
+                  :href="`https://${aboutInfo.repoUrl}`"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="meta-link"
-                  @click.prevent="openExternal('https://github.com/XgzK/intellijapp')"
+                  @click.prevent="openExternal(`https://${aboutInfo.repoUrl}`)"
                 >
-                  github.com/XgzK/intellijapp
+                  {{ aboutInfo.repoUrl }}
                 </a>
               </div>
               <div class="meta-row">
                 <span class="meta-label">开发者</span>
                 <span class="meta-value meta-value--developers">
-                  <a
-                    class="meta-link"
-                    href="https://github.com/XgzK"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    @click.prevent="openExternal('https://github.com/XgzK')"
-                  >
-                    XgzK
-                  </a>
-                  ·
-                  <a
-                    class="meta-link"
-                    href="https://github.com/anthropics/claude-code"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    @click.prevent="openExternal('https://github.com/anthropics/claude-code')"
-                  >
-                    Claude (AI)
-                  </a>
-                  ·
-                  <a
-                    class="meta-link"
-                    href="https://github.com/openai/codex"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    @click.prevent="openExternal('https://github.com/openai/codex')"
-                  >
-                    Codex (AI)
-                  </a>
+                  <template v-for="(dev, index) in aboutInfo.developers" :key="dev.name">
+                    <span v-if="index > 0"> · </span>
+                    <a
+                      class="meta-link"
+                      :href="dev.url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      @click.prevent="openExternal(dev.url)"
+                    >
+                      {{ dev.name }}
+                    </a>
+                  </template>
                 </span>
               </div>
             </div>

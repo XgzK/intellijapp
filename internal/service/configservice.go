@@ -6,28 +6,46 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-// ConfigService provides path validation utilities for IntelliJ configuration management.
+// ConfigService 提供 IntelliJ 配置管理的路径验证工具
 type ConfigService struct {
 	logger *log.Logger
 }
 
-// ConfigPaths holds validated configuration paths
+// ConfigPaths 保存已验证的配置路径
 type ConfigPaths struct {
 	IntelliJBinDir string
 	ConfigDir      string
 }
 
-// NewConfigService constructs a ConfigService instance ready for binding with Wails.
+// Developer 保存开发者信息
+type Developer struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
+// AboutInfo 保存应用程序关于信息
+type AboutInfo struct {
+	AppName      string      `json:"appName"`
+	Version      string      `json:"version"`
+	GoVersion    string      `json:"goVersion"`
+	VueVersion   string      `json:"vueVersion"`
+	WailsVersion string      `json:"wailsVersion"`
+	RepoURL      string      `json:"repoUrl"`
+	Developers   []Developer `json:"developers"`
+}
+
+// NewConfigService 构造一个准备好与 Wails 绑定的 ConfigService 实例
 func NewConfigService() *ConfigService {
 	return &ConfigService{
 		logger: log.Default(),
 	}
 }
 
-// SubmitPaths validates the provided paths, modifies vmoptions files, and applies configuration.
+// SubmitPaths 验证提供的路径，修改 vmoptions 文件并应用配置
 func (c *ConfigService) SubmitPaths(projectPath string, configPath string) (string, error) {
 	c.logger.Printf("开始验证路径 - IntelliJ路径: %s, 配置路径: %s", projectPath, configPath)
 
@@ -81,7 +99,7 @@ func (c *ConfigService) SubmitPaths(projectPath string, configPath string) (stri
 	return fmt.Sprintf("配置成功应用到 %d 个文件, 请重启需要激活编译器输入激活码", processedCount), nil
 }
 
-// ClearConfig removes the added configuration from vmoptions files.
+// ClearConfig 从 vmoptions 文件中移除添加的配置
 func (c *ConfigService) ClearConfig(projectPath string) (string, error) {
 	c.logger.Printf("开始清除配置 - IntelliJ路径: %s", projectPath)
 
@@ -126,7 +144,7 @@ func (c *ConfigService) ClearConfig(projectPath string) (string, error) {
 	return fmt.Sprintf("成功清除 %d 个文件的配置", clearedCount), nil
 }
 
-// PathExists performs a lightweight existence check for the provided path.
+// PathExists 对提供的路径执行轻量级存在性检查
 func (c *ConfigService) PathExists(path string) (bool, error) {
 	cleaned := sanitizePath(path)
 	if cleaned == "" {
@@ -143,6 +161,24 @@ func (c *ConfigService) PathExists(path string) (bool, error) {
 	return true, nil
 }
 
+// GetAboutInfo 返回应用程序关于信息
+func (c *ConfigService) GetAboutInfo() AboutInfo {
+	return AboutInfo{
+		AppName:      "IntelliJ 配置助手",
+		Version:      "v1.0.3",
+		GoVersion:    runtime.Version(),
+		VueVersion:   "3.5.22",
+		WailsVersion: "v3",
+		RepoURL:      "github.com/XgzK/intellijapp",
+		Developers: []Developer{
+			{Name: "XgzK", URL: "https://github.com/XgzK"},
+			{Name: "Claude (AI)", URL: "https://github.com/anthropics/claude-code"},
+			{Name: "Codex (AI)", URL: "https://github.com/openai/codex"},
+		},
+	}
+}
+
+// sanitizePath 清理路径字符串，去除首尾空格并规范化路径
 func sanitizePath(path string) string {
 	trimmed := strings.TrimSpace(path)
 	if trimmed == "" {
@@ -151,6 +187,7 @@ func sanitizePath(path string) string {
 	return filepath.Clean(trimmed)
 }
 
+// validateConfigPath 验证配置目录是否存在且包含必需的 ja-netfilter.jar 文件
 func validateConfigPath(configDir string) error {
 	info, err := os.Stat(configDir)
 	if err != nil {
@@ -176,6 +213,7 @@ func validateConfigPath(configDir string) error {
 	return nil
 }
 
+// validateIntelliJPath 验证 IntelliJ 软件路径，自动识别并返回 bin 目录路径
 func validateIntelliJPath(softwarePath string) (string, error) {
 	info, err := os.Stat(softwarePath)
 	if err != nil {
@@ -215,6 +253,7 @@ func validateIntelliJPath(softwarePath string) (string, error) {
 	return candidateBin, nil
 }
 
+// directoryHasVMOptions 检查目录是否包含 .vmoptions 文件
 func directoryHasVMOptions(dir string) (bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -235,6 +274,11 @@ func directoryHasVMOptions(dir string) (bool, error) {
 
 // findVMOptionsFiles 查找目录中所有的 .vmoptions 文件
 func findVMOptionsFiles(dir string) ([]string, error) {
+	// 检查目录读取权限
+	if err := checkDirReadPermission(dir); err != nil {
+		return nil, err
+	}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("无法读取目录 %s: %w", dir, err)
@@ -255,6 +299,16 @@ func findVMOptionsFiles(dir string) ([]string, error) {
 
 // processVMOptionsFile 处理单个 vmoptions 文件
 func processVMOptionsFile(filePath string, configPath string, logger *log.Logger) error {
+	// 检查文件读取权限
+	if err := checkFileReadPermission(filePath); err != nil {
+		return err
+	}
+
+	// 检查文件写入权限
+	if err := checkFileWritePermission(filePath); err != nil {
+		return err
+	}
+
 	// 读取文件内容
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -301,8 +355,18 @@ func processVMOptionsFile(filePath string, configPath string, logger *log.Logger
 	return nil
 }
 
-// clearVMOptionsFile 清除单个 vmoptions 文件中所有以 --add-opens 和 -javaagent: 开头的配置
+// clearVMOptionsFile 清除单个 vmoptions 文件中本工具添加的特定配置（不影响用户自定义配置）
 func clearVMOptionsFile(filePath string, logger *log.Logger) error {
+	// 检查文件读取权限
+	if err := checkFileReadPermission(filePath); err != nil {
+		return err
+	}
+
+	// 检查文件写入权限
+	if err := checkFileWritePermission(filePath); err != nil {
+		return err
+	}
+
 	// 读取文件内容
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -313,19 +377,25 @@ func clearVMOptionsFile(filePath string, logger *log.Logger) error {
 	var newLines []string
 	removedCount := 0
 
+	// 本工具添加的特定配置行
+	toolAddedLines := map[string]bool{
+		"--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED":      true,
+		"--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED": true,
+	}
+
 	// 处理每一行
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		// 跳过所有以 --add-opens 开头的行
-		if strings.HasPrefix(trimmed, "--add-opens") {
+		// 只删除本工具添加的特定 --add-opens 配置
+		if toolAddedLines[trimmed] {
 			logger.Printf("删除行: %s", trimmed)
 			removedCount++
 			continue
 		}
 
-		// 跳过所有以 -javaagent: 开头的行
-		if strings.HasPrefix(trimmed, "-javaagent:") {
+		// 只删除包含 ja-netfilter.jar=jetbrains 的 javaagent 配置
+		if strings.HasPrefix(trimmed, "-javaagent:") && strings.Contains(trimmed, "ja-netfilter.jar=jetbrains") {
 			logger.Printf("删除行: %s", trimmed)
 			removedCount++
 			continue
@@ -347,4 +417,50 @@ func clearVMOptionsFile(filePath string, logger *log.Logger) error {
 
 	logger.Printf("成功清除文件: %s (删除了 %d 行)", filepath.Base(filePath), removedCount)
 	return nil
+}
+
+// checkFileReadPermission 检查文件是否有读取权限
+func checkFileReadPermission(filePath string) error {
+	file, err := os.OpenFile(filePath, os.O_RDONLY, 0)
+	if err != nil {
+		if os.IsPermission(err) {
+			return formatPermissionError(filePath, "读取")
+		}
+		return err
+	}
+	file.Close()
+	return nil
+}
+
+// checkFileWritePermission 检查文件是否有写入权限
+func checkFileWritePermission(filePath string) error {
+	file, err := os.OpenFile(filePath, os.O_WRONLY, 0)
+	if err != nil {
+		if os.IsPermission(err) {
+			return formatPermissionError(filePath, "写入")
+		}
+		return err
+	}
+	file.Close()
+	return nil
+}
+
+// checkDirReadPermission 检查目录是否有读取权限
+func checkDirReadPermission(dirPath string) error {
+	_, err := os.ReadDir(dirPath)
+	if err != nil {
+		if os.IsPermission(err) {
+			return formatPermissionError(dirPath, "读取")
+		}
+		return err
+	}
+	return nil
+}
+
+// formatPermissionError 格式化权限错误信息
+func formatPermissionError(path string, operation string) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("没有%s权限: %s\n请以管理员身份运行程序", operation, path)
+	}
+	return fmt.Errorf("没有%s权限: %s\n请使用 sudo 或以 root 身份运行程序", operation, path)
 }

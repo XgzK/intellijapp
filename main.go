@@ -3,30 +3,28 @@ package main
 import (
 	"embed"
 	"log"
-	"time"
 
 	"github.com/XgzK/intellijapp/internal/service"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// Wails uses Go's `embed` package to embed the frontend files into the binary.
-// Any files in the frontend/dist folder will be embedded into the binary and
-// made available to the frontend.
-// See https://pkg.go.dev/embed for more information.
+// Wails 使用 Go 的 `embed` 包将前端文件嵌入到二进制文件中
+// frontend/dist 文件夹中的所有文件都将被嵌入到二进制文件中
+// 并可供前端使用
+// 更多信息请参阅 https://pkg.go.dev/embed
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
-// main function serves as the application's entry point. It initializes the application, creates a window,
-// and starts a goroutine that emits a time-based event every second. It subsequently runs the application and
-// logs any error that might occur.
+// main 函数作为应用程序的入口点，它初始化应用程序、创建窗口
+// 然后运行应用程序并记录可能发生的任何错误
 func main() {
 
-	// Create a new Wails application by providing the necessary options.
-	// Variables 'Name' and 'Description' are for application metadata.
-	// 'Assets' configures the asset server with the 'FS' variable pointing to the frontend files.
-	// 'Bind' is a list of Go struct instances. The frontend has access to the methods of these instances.
-	// 'Mac' options tailor the application when running an macOS.
+	// 通过提供必要的选项创建一个新的 Wails 应用程序
+	// 变量 'Name' 和 'Description' 用于应用程序元数据
+	// 'Assets' 配置资产服务器，'FS' 变量指向前端文件
+	// 'Services' 是 Go 服务实例列表，前端可以访问这些实例的方法
+	// 'Mac' 选项用于在 macOS 上运行应用程序时进行定制
 	app := application.New(application.Options{
 		Name:        "intellijapp",
 		Description: "IntelliJ Configuration Helper",
@@ -41,11 +39,11 @@ func main() {
 		},
 	})
 
-	// Create a new window with the necessary options.
-	// 'Title' is the title of the window.
-	// 'Mac' options tailor the window when running on macOS.
-	// 'BackgroundColour' is the background colour of the window.
-	// 'URL' is the URL that will be loaded into the webview.
+	// 使用必要的选项创建一个新窗口
+	// 'Title' 是窗口的标题
+	// 'Mac' 选项用于在 macOS 上运行时定制窗口
+	// 'BackgroundColour' 是窗口的背景颜色
+	// 'URL' 是将加载到 webview 中的 URL
 	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "IntelliJ Config Helper",
 		Frameless: true,
@@ -58,20 +56,10 @@ func main() {
 		URL:              "/",
 	})
 
-	// Create a goroutine that emits an event containing the current time every second.
-	// The frontend can listen to this event and update the UI accordingly.
-	go func() {
-		for {
-			now := time.Now().Format(time.RFC1123)
-			app.Event.Emit("time", now)
-			time.Sleep(time.Second)
-		}
-	}()
-
-	// Run the application. This blocks until the application has been exited.
+	// 运行应用程序。这会阻塞直到应用程序退出
 	err := app.Run()
 
-	// If an error occurred while running the application, log it and exit.
+	// 如果运行应用程序时发生错误，记录错误并退出
 	if err != nil {
 		log.Fatal(err)
 	}
