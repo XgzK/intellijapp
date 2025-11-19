@@ -5,6 +5,9 @@ frontend1/node_modules
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 
+# 忽略所有可执行文件
+*.exe
+
 .idea
 .serena
 frontend/.vscode
