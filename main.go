@@ -2,7 +2,8 @@ package main
 
 import (
 	"embed"
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/XgzK/intellijapp/internal/service"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -59,8 +60,9 @@ func main() {
 	// 运行应用程序。这会阻塞直到应用程序退出
 	err := app.Run()
 
-	// 如果运行应用程序时发生错误，记录错误并退出
+	// 如果运行应用程序时发生错误，使用 slog 记录错误并退出
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("应用程序运行失败", slog.Any("error", err))
+		os.Exit(1)
 	}
 }
