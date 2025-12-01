@@ -202,8 +202,9 @@ intellijapp/
 
 **多架构支持：**
 - ✨ 新增 Windows ARM64 安装包（适用于 Surface Pro X 等 ARM 设备）
+- ✨ 新增 Linux ARM64 安装包（适用于树莓派 4/5、ARM 服务器）
 - ✨ macOS 分离架构打包：arm64 和 amd64 独立发布（减小下载体积）
-- 📦 共支持 7 个平台/架构组合
+- 📦 共支持 10 个平台/架构组合
 
 **macOS 改进：**
 - 🛠️ 添加自动安装脚本 `install.sh`，一键解决 Gatekeeper 阻止问题

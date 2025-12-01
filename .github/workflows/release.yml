@@ -101,10 +101,17 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Configure multiarch for ARM64
+        if: runner.os == 'Linux'
+        run: |
+          # Enable arm64 architecture
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update
+
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
+          # Install native amd64 build tools and libraries
           sudo apt-get install -y \
             build-essential \
             pkg-config \
@@ -119,9 +126,23 @@ jobs:
             libharfbuzz-dev \
             libatk1.0-dev \
             nsis \
-            rpm \
+            rpm
+
+          # Install ARM64 cross-compilation tools
+          sudo apt-get install -y \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu
+
+          # Install ARM64 libraries for cross-compilation
+          sudo apt-get install -y \
+            libgtk-3-dev:arm64 \
+            libglib2.0-dev:arm64 \
+            libpango1.0-dev:arm64 \
+            libcairo2-dev:arm64 \
+            libgdk-pixbuf-2.0-dev:arm64 \
+            libsoup-3.0-dev:arm64 \
+            libharfbuzz-dev:arm64 \
+            libatk1.0-dev:arm64 || echo "Some ARM64 packages may not be available"
 
       - name: Install Wails CLI (Linux)
         if: runner.os == 'Linux'
@@ -267,19 +288,49 @@ jobs:
 
           cd ..
 
-      - name: Package Linux AppImage
+      - name: Package Linux AppImage (amd64)
         if: runner.os == 'Linux' && contains(matrix.formats, 'appimage')
-        run: task linux:create:appimage
+        run: ARCH=amd64 task linux:create:appimage
         continue-on-error: true
 
-      - name: Package Linux DEB
+      - name: Package Linux AppImage (arm64)
+        if: runner.os == 'Linux' && contains(matrix.formats, 'appimage')
+        run: |
+          export ARCH=arm64
+          export CC=aarch64-linux-gnu-gcc
+          export CXX=aarch64-linux-gnu-g++
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+          task linux:create:appimage
+        continue-on-error: true
+
+      - name: Package Linux DEB (amd64)
         if: runner.os == 'Linux' && contains(matrix.formats, 'deb')
-        run: task linux:create:deb
+        run: ARCH=amd64 task linux:create:deb
         continue-on-error: true
 
-      - name: Package Linux RPM
+      - name: Package Linux DEB (arm64)
+        if: runner.os == 'Linux' && contains(matrix.formats, 'deb')
+        run: |
+          export ARCH=arm64
+          export CC=aarch64-linux-gnu-gcc
+          export CXX=aarch64-linux-gnu-g++
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+          task linux:create:deb
+        continue-on-error: true
+
+      - name: Package Linux RPM (amd64)
         if: runner.os == 'Linux' && contains(matrix.formats, 'rpm')
-        run: task linux:create:rpm
+        run: ARCH=amd64 task linux:create:rpm
+        continue-on-error: true
+
+      - name: Package Linux RPM (arm64)
+        if: runner.os == 'Linux' && contains(matrix.formats, 'rpm')
+        run: |
+          export ARCH=arm64
+          export CC=aarch64-linux-gnu-gcc
+          export CXX=aarch64-linux-gnu-g++
+          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+          task linux:create:rpm
         continue-on-error: true
 
       - name: Rename Linux packages
@@ -288,13 +339,18 @@ jobs:
           # Extract version from tag (e.g., v1.0.2 -> 1.0.2)
           VERSION=${GITHUB_REF#refs/tags/v}
 
-          # Rename files with standardized naming
+          # Rename amd64 files
           [ -f "bin/intellijapp-x86_64.AppImage" ] && mv "bin/intellijapp-x86_64.AppImage" "bin/intellijapp-${VERSION}-linux-amd64.AppImage"
           [ -f "bin/intellijapp.deb" ] && mv "bin/intellijapp.deb" "bin/intellijapp-${VERSION}-linux-amd64.deb"
           [ -f "bin/intellijapp.rpm" ] && mv "bin/intellijapp.rpm" "bin/intellijapp-${VERSION}-linux-amd64.rpm"
 
+          # Rename arm64 files
+          [ -f "bin/intellijapp-aarch64.AppImage" ] && mv "bin/intellijapp-aarch64.AppImage" "bin/intellijapp-${VERSION}-linux-arm64.AppImage"
+          [ -f "bin/intellijapp_arm64.deb" ] && mv "bin/intellijapp_arm64.deb" "bin/intellijapp-${VERSION}-linux-arm64.deb"
+          [ -f "bin/intellijapp.aarch64.rpm" ] && mv "bin/intellijapp.aarch64.rpm" "bin/intellijapp-${VERSION}-linux-arm64.rpm"
+
           # Clean up temporary binary files
-          rm -f bin/intellijapp
+          rm -f bin/intellijapp bin/intellijapp-amd64 bin/intellijapp-arm64
 
       - name: Upload Package Artifacts
         if: success()
