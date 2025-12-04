@@ -183,12 +183,22 @@ jobs:
 
       - name: Package Windows NSIS (amd64)
         if: runner.os == 'Windows' && contains(matrix.formats, 'nsis')
-        run: task windows:create:nsis:installer ARCH=amd64
+        run: |
+          task windows:create:nsis:installer ARCH=amd64
+          # Immediately rename amd64 binary to prevent overwriting
+          if (Test-Path "bin\intellijapp.exe") {
+            Move-Item "bin\intellijapp.exe" "bin\intellijapp-amd64.exe" -Force
+          }
         shell: pwsh
 
       - name: Package Windows NSIS (arm64)
         if: runner.os == 'Windows' && contains(matrix.formats, 'nsis')
-        run: task windows:create:nsis:installer ARCH=arm64
+        run: |
+          task windows:create:nsis:installer ARCH=arm64
+          # Immediately rename arm64 binary to prevent loss
+          if (Test-Path "bin\intellijapp.exe") {
+            Move-Item "bin\intellijapp.exe" "bin\intellijapp-arm64.exe" -Force
+          }
         shell: pwsh
 
       # MSIX packaging disabled - not supported in current Wails v3 version
@@ -208,13 +218,16 @@ jobs:
           if (Test-Path "bin\intellijapp-amd64-installer.exe") {
             Rename-Item "bin\intellijapp-amd64-installer.exe" "intellijapp-${VERSION}-windows-amd64-installer.exe"
           }
-          if (Test-Path "bin\intellijapp.exe") {
-            Rename-Item "bin\intellijapp.exe" "intellijapp-${VERSION}-windows-amd64.exe"
+          if (Test-Path "bin\intellijapp-amd64.exe") {
+            Rename-Item "bin\intellijapp-amd64.exe" "intellijapp-${VERSION}-windows-amd64.exe"
           }
 
           # Rename arm64 files with standardized naming
           if (Test-Path "bin\intellijapp-arm64-installer.exe") {
             Rename-Item "bin\intellijapp-arm64-installer.exe" "intellijapp-${VERSION}-windows-arm64-installer.exe"
+          }
+          if (Test-Path "bin\intellijapp-arm64.exe") {
+            Rename-Item "bin\intellijapp-arm64.exe" "intellijapp-${VERSION}-windows-arm64.exe"
           }
 
       - name: Package macOS App (arm64)
