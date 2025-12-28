@@ -13,11 +13,9 @@ interface Emits {
 defineProps<Props>()
 const emit = defineEmits<Emits>()
 
-const appWindow = Window
-
 const handleClose = async () => {
   try {
-    await appWindow.Close()
+    await Window.Close()
   } catch (error) {
     console.error('关闭窗口失败', error)
   }
@@ -25,7 +23,7 @@ const handleClose = async () => {
 
 const handleMinimize = async () => {
   try {
-    await appWindow.Minimise()
+    await Window.Minimise()
   } catch (error) {
     console.error('最小化窗口失败', error)
   }
@@ -33,11 +31,11 @@ const handleMinimize = async () => {
 
 const handleZoom = async () => {
   try {
-    const maximised = await appWindow.IsMaximised()
+    const maximised = await Window.IsMaximised()
     if (maximised) {
-      await appWindow.Restore()
+      await Window.Restore()
     } else {
-      await appWindow.Maximise()
+      await Window.Maximise()
     }
   } catch (error) {
     console.error('切换窗口大小失败', error)
