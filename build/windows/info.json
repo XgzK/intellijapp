@@ -1,10 +1,10 @@
 {
 	"fixed": {
-		"file_version": "0.1.0"
+		"file_version": "1.0.5"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.1.0",
+			"ProductVersion": "1.0.5",
 			"CompanyName": "My Company",
 			"FileDescription": "My Product Description",
 			"LegalCopyright": "© now, My Company",

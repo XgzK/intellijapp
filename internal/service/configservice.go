@@ -179,7 +179,7 @@ func (c *ConfigService) PathExists(path string) (bool, error) {
 func (c *ConfigService) GetAboutInfo() AboutInfo {
 	return AboutInfo{
 		AppName:      "IntelliJ 配置助手",
-		Version:      "v1.0.4",
+		Version:      "v1.0.5",
 		GoVersion:    runtime.Version(),
 		VueVersion:   "3.5.22",
 		WailsVersion: "v3",
@@ -334,7 +334,7 @@ func processVMOptionsFile(filePath, configPath string, logger *slog.Logger) erro
 	newLines = append(newLines,
 		"--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED",
 		"--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED",
-		fmt.Sprintf("-javaagent:%s/ja-netfilter.jar=jetbrains", configPath),
+		fmt.Sprintf("-javaagent:\"%s/ja-netfilter.jar\"=jetbrains", configPath),
 	)
 
 	logger.Debug("添加配置",
@@ -389,8 +389,10 @@ func clearVMOptionsFile(filePath string, logger *slog.Logger) error {
 			return true
 		}
 
-		// 只删除包含 ja-netfilter.jar=jetbrains 的 javaagent 配置
-		if strings.HasPrefix(trimmed, "-javaagent:") && strings.Contains(trimmed, "ja-netfilter.jar=jetbrains") {
+		// 只删除包含 ja-netfilter.jar 和 jetbrains 的 javaagent 配置（兼容有引号和无引号格式）
+		if strings.HasPrefix(trimmed, "-javaagent:") &&
+			strings.Contains(trimmed, "ja-netfilter.jar") &&
+			strings.Contains(trimmed, "jetbrains") {
 			logger.Debug("删除行", slog.String("line", trimmed))
 			removedCount++
 			return true

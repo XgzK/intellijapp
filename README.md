@@ -158,8 +158,10 @@ intellijapp/
 ```
 --add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED
 --add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED
--javaagent:<配置路径>/ja-netfilter.jar=jetbrains
+-javaagent:"<配置路径>/ja-netfilter.jar"=jetbrains
 ```
+
+> **注意**：路径使用引号包裹，支持包含空格的目录（如 `D:\Program Files\config`）。
 
 ### 权限检查
 
@@ -172,7 +174,7 @@ intellijapp/
 清除配置时**仅删除**以下本工具添加的行：
 - `--add-opens=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED`
 - `--add-opens=java.base/jdk.internal.org.objectweb.asm.tree=ALL-UNNAMED`
-- `-javaagent:**/ja-netfilter.jar=jetbrains`
+- `-javaagent:"**/ja-netfilter.jar"=jetbrains`（兼容有引号和无引号格式）
 
 **不会删除**用户自定义的其他 `--add-opens` 或 `-javaagent` 配置。
 
