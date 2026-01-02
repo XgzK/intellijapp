@@ -1,0 +1,16 @@
+# 依赖
+node_modules/
+dist/
+build/
+
+# 生成的文件
+bindings/
+*.generated.*
+
+# 配置文件
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Wails 生成文件
+wailsjs/

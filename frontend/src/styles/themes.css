@@ -1,0 +1,128 @@
+/**
+ * 主题 CSS 变量定义
+ * 支持亮色和暗色主题
+ */
+
+/* ========== 暗色主题（默认） ========== */
+:root,
+[data-theme='dark'] {
+  --color-background: #0b1624;
+  --color-surface: rgba(16, 28, 44, 0.78);
+  --color-surface-strong: rgba(24, 40, 60, 0.92);
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(66, 184, 131, 0.45);
+  --color-text: #e8f1ff;
+  --color-muted: rgba(232, 241, 255, 0.72);
+  --color-accent: #42b883;
+  --color-accent-strong: #2d88ff;
+  --color-danger: #ee5a6f;
+
+  /* 渐变背景 */
+  --gradient-background: radial-gradient(circle at top left, #1b2636 0%, #0b1624 45%, #09111d 100%);
+
+  /* 按钮阴影 */
+  --shadow-primary: 0 12px 24px rgba(45, 136, 255, 0.35);
+  --shadow-primary-hover: 0 16px 30px rgba(45, 136, 255, 0.45);
+  --shadow-danger: 0 12px 24px rgba(238, 90, 111, 0.35);
+  --shadow-danger-hover: 0 16px 30px rgba(238, 90, 111, 0.45);
+
+  /* 通用组件阴影 */
+  --shadow-panel: 0 18px 36px rgba(0, 0, 0, 0.32);
+  --shadow-feedback: 0 12px 24px rgba(0, 0, 0, 0.28);
+
+  /* 输入框背景 */
+  --input-background: rgba(12, 24, 38, 0.88);
+  --input-background-hover: rgba(12, 24, 38, 0.95);
+  --input-background-focus: rgba(12, 24, 38, 1);
+
+  /* 面板背景 */
+  --panel-background: rgba(16, 28, 44, 0.75);
+  --panel-background-hover: rgba(20, 34, 52, 0.85);
+
+  /* 反馈消息 */
+  --feedback-success-color: #8ef5c3;
+  --feedback-success-bg: rgba(66, 184, 131, 0.12);
+  --feedback-success-border: rgba(142, 245, 195, 0.25);
+  --feedback-error-color: #ffb8b0;
+  --feedback-error-bg: rgba(255, 107, 107, 0.12);
+  --feedback-error-border: rgba(255, 184, 176, 0.25);
+
+  /* 警告面板 */
+  --warning-text: rgba(255, 230, 200, 0.9);
+  --warning-text-alt: rgba(255, 235, 210, 0.9);
+
+  /* About 页文字 */
+  --about-notice-text: rgba(255, 230, 180, 0.92);
+  --about-footer-text: rgba(232, 241, 255, 0.5);
+}
+
+/* ========== 亮色主题（梦幻玻璃版） ========== */
+[data-theme='light'] {
+  --color-background: #f8fafc;
+  --color-surface: rgba(255, 255, 255, 0.65); /* 65% 透明度，透出背景 */
+  --color-surface-strong: rgba(255, 255, 255, 0.85);
+  --color-border: rgba(255, 255, 255, 0.8); /* 亮白色边框，模拟玻璃边缘反光 */
+  --color-border-strong: rgba(255, 255, 255, 1);
+  --color-text: #334155;
+  --color-muted: #64748b;
+  --color-accent: #10b981;
+  --color-accent-strong: #3b82f6;
+  --color-danger: #ef4444;
+
+  /* 渐变背景 - 极光弥散 (Mesh Gradient) - 增强版 */
+  /* 提高透明度和色彩饱和度，确保肉眼可见的梦幻效果 */
+  --gradient-background: 
+    radial-gradient(circle at 15% 15%, rgba(167, 243, 208, 0.5) 0px, transparent 40%), /* 薄荷绿 */
+    radial-gradient(circle at 85% 15%, rgba(165, 180, 252, 0.5) 0px, transparent 40%), /* 淡紫 */
+    radial-gradient(circle at 85% 85%, rgba(253, 186, 116, 0.45) 0px, transparent 40%), /* 暖橙 */
+    radial-gradient(circle at 15% 85%, rgba(196, 181, 253, 0.45) 0px, transparent 40%), /* 浅紫 */
+    #f1f5f9; /* 底色稍微加深一点点灰度，衬托亮光 */
+
+  /* 按钮阴影 - 玻璃投影 */
+  --shadow-primary: 0 8px 16px rgba(59, 130, 246, 0.25);
+  --shadow-primary-hover: 0 12px 20px rgba(59, 130, 246, 0.35);
+  --shadow-danger: 0 8px 16px rgba(239, 68, 68, 0.25);
+  --shadow-danger-hover: 0 12px 20px rgba(239, 68, 68, 0.35);
+
+  /* 通用组件阴影 - 柔光 */
+  --shadow-panel: 0 8px 32px rgba(31, 38, 135, 0.07);
+  --shadow-feedback: 0 8px 32px rgba(31, 38, 135, 0.05);
+
+  /* 输入框背景 - 半透明磨砂 */
+  --input-background: rgba(255, 255, 255, 0.5);
+  --input-background-hover: rgba(255, 255, 255, 0.7);
+  --input-background-focus: rgba(255, 255, 255, 0.9);
+
+  /* 面板背景 - 在 themes 里主要定义颜色，模糊效果由 global.css 的 backdrop-filter 处理 */
+  --panel-background: rgba(255, 255, 255, 0.6);
+  --panel-background-hover: rgba(255, 255, 255, 0.8);
+
+  /* 反馈消息 */
+  --feedback-success-color: #047857;
+  --feedback-success-bg: rgba(209, 250, 229, 0.8);
+  --feedback-success-border: rgba(52, 211, 153, 0.5);
+  --feedback-error-color: #b91c1c;
+  --feedback-error-bg: rgba(254, 226, 226, 0.8);
+  --feedback-error-border: rgba(252, 165, 165, 0.5);
+
+  /* 警告面板 - 更加醒目但柔和的橙色 */
+  --warning-text: #b45309;
+  --warning-text-alt: #92400e;
+
+  /* About 页文字 */
+  --about-notice-text: #92400e;
+  --about-footer-text: #475569;
+}
+
+/* ========== 主题过渡动画 ========== */
+* {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+/* 排除某些元素的过渡效果 */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}

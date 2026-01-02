@@ -5,9 +5,24 @@ import { AboutInfo } from '../bindings/github.com/XgzK/intellijapp/internal/serv
 import TitleBar from '@/components/TitleBar.vue'
 import MainView from '@/components/MainView.vue'
 import AboutView from '@/components/AboutView.vue'
+import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import UpdateNotification from '@/components/UpdateNotification.vue'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const currentView = ref<'main' | 'about'>('main')
-const aboutInfo = ref<AboutInfo>(new AboutInfo())
+const { handleError } = useErrorHandler()
+
+// 优化：使用对象字面量初始化，而非 new AboutInfo()
+// AboutInfo 是从 Go 生成的类型定义，应提供合理的默认值
+const aboutInfo = ref<AboutInfo>({
+  appName: '',
+  version: '',
+  goVersion: '',
+  vueVersion: '',
+  wailsVersion: '',
+  repoUrl: '',
+  developers: [],
+})
 
 const switchView = (view: 'main' | 'about') => {
   currentView.value = view
@@ -18,43 +33,34 @@ onMounted(async () => {
   try {
     aboutInfo.value = await GetAboutInfo()
   } catch (error) {
-    console.error('获取关于信息失败', error)
+    handleError(error, 'GetAboutInfo')
   }
 })
 </script>
 
 <template>
   <div class="window">
-    <TitleBar
-      title="IntelliJ 配置助手"
-      :current-view="currentView"
-      @switch-view="switchView"
-    />
-    <MainView v-if="currentView === 'main'" />
-    <AboutView v-else :about-info="aboutInfo" />
+    <UpdateNotification />
+    <TitleBar :title="$t('titleBar.title')" :current-view="currentView" @switch-view="switchView" />
+    <ErrorBoundary>
+      <MainView v-if="currentView === 'main'" />
+      <AboutView v-else :about-info="aboutInfo" />
+    </ErrorBoundary>
   </div>
 </template>
 
 <style scoped>
 .window {
-  --color-background: #0b1624;
-  --color-surface: rgba(16, 28, 44, 0.78);
-  --color-surface-strong: rgba(24, 40, 60, 0.92);
-  --color-border: rgba(255, 255, 255, 0.12);
-  --color-border-strong: rgba(66, 184, 131, 0.45);
-  --color-text: #e8f1ff;
-  --color-muted: rgba(232, 241, 255, 0.72);
-  --color-accent: #42b883;
-  --color-accent-strong: #2d88ff;
-  --color-danger: #ee5a6f;
+  /* 间距变量 */
   --space-xs: 0.3rem;
   --space-sm: 0.5rem;
   --space-md: 0.75rem;
   --space-lg: 1.1rem;
   --space-xl: 1.6rem;
+
   height: 100vh;
   overflow: hidden;
-  background: radial-gradient(circle at top left, #1b2636 0%, #0b1624 45%, #09111d 100%);
+  /* 背景已在 global.css 中统一设置 */
   color: var(--color-text);
   font-family: 'Segoe UI', sans-serif;
   display: flex;

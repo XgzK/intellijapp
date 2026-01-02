@@ -27,7 +27,7 @@ func main() {
 	// 'Services' 是 Go 服务实例列表，前端可以访问这些实例的方法
 	// 'Mac' 选项用于在 macOS 上运行应用程序时进行定制
 	app := application.New(application.Options{
-		Name:        "intellijapp",
+		Name:        "IntelliJ",
 		Description: "IntelliJ Configuration Helper",
 		Services: []application.Service{
 			application.NewService(service.NewConfigService()),

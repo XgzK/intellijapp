@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { Window } from '@wailsio/runtime'
+import ThemeSwitcher from './ThemeSwitcher.vue'
+import LanguageSwitcher from './LanguageSwitcher.vue'
 
 interface Props {
   title: string
@@ -7,7 +9,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'switch-view', view: 'main' | 'about'): void
+  (e: 'switchView', view: 'main' | 'about'): void
 }
 
 defineProps<Props>()
@@ -43,7 +45,7 @@ const handleZoom = async () => {
 }
 
 const switchView = (view: 'main' | 'about') => {
-  emit('switch-view', view)
+  emit('switchView', view)
 }
 </script>
 
@@ -55,6 +57,10 @@ const switchView = (view: 'main' | 'about') => {
       <button class="traffic-button zoom" type="button" @click.stop="handleZoom" />
     </div>
     <div class="title">{{ title }}</div>
+    <div class="controls">
+      <LanguageSwitcher />
+      <ThemeSwitcher />
+    </div>
     <nav class="nav-buttons">
       <button
         class="nav-button"
@@ -62,7 +68,7 @@ const switchView = (view: 'main' | 'about') => {
         type="button"
         @click="switchView('main')"
       >
-        主页
+        {{ $t('navigation.main') }}
       </button>
       <button
         class="nav-button"
@@ -70,7 +76,7 @@ const switchView = (view: 'main' | 'about') => {
         type="button"
         @click="switchView('about')"
       >
-        关于
+        {{ $t('navigation.about') }}
       </button>
     </nav>
   </header>
@@ -85,7 +91,8 @@ const switchView = (view: 'main' | 'about') => {
   gap: var(--space-md);
   background: rgba(6, 13, 22, 0.78);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  -webkit-app-region: drag;
+  /* Wails v3 窗口拖拽 */
+  --wails-draggable: drag;
 }
 
 .traffic-lights {
@@ -98,11 +105,13 @@ const switchView = (view: 'main' | 'about') => {
   height: 14px;
   border-radius: 50%;
   border: none;
-  -webkit-app-region: no-drag;
+  /* 防止按钮触发窗口拖拽 */
+  --wails-draggable: no-drag;
   cursor: pointer;
   transition: transform 0.15s ease;
   position: relative;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6),
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
     inset 0 -1px 1px rgba(0, 0, 0, 0.4);
 }
 
@@ -131,10 +140,19 @@ const switchView = (view: 'main' | 'about') => {
   flex: 1;
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* 控制区域不触发拖拽 */
+  --wails-draggable: no-drag;
+}
+
 .nav-buttons {
   display: flex;
   gap: 0.5rem;
-  -webkit-app-region: no-drag;
+  /* 导航按钮不触发拖拽 */
+  --wails-draggable: no-drag;
 }
 
 .nav-button {
@@ -146,7 +164,11 @@ const switchView = (view: 'main' | 'about') => {
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.15s ease;
 }
 
 .nav-button:hover {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { SubmitPaths, ClearConfig, PathExists } from '@/services/configService'
+import { CONFIG_PATH_PATTERN, VALIDATION_MESSAGES, PATH_LABELS } from '@/constants/validation'
+import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const projectPath = ref('')
 const configPath = ref('')
@@ -8,44 +10,19 @@ const statusMessage = ref('')
 const submitting = ref(false)
 const clearing = ref(false)
 const isError = ref(false)
-const CONFIG_PATH_PATTERN = /^[A-Za-z0-9:\\/\s_\-.]+$/
 
-const extractErrorMessage = (error: unknown): string => {
-  const parse = (value: string) => {
-    const trimmed = value.trim()
-    if (!trimmed) {
-      return '未知错误'
-    }
+const { handleError: handleGlobalError } = useErrorHandler()
 
-    const descIndex = trimmed.lastIndexOf('desc=')
-    if (descIndex !== -1) {
-      return trimmed.substring(descIndex + 5).trim()
-    }
-
-    const colonIndex = trimmed.lastIndexOf(':')
-    if (colonIndex !== -1) {
-      return trimmed.substring(colonIndex + 1).trim()
-    }
-
-    return trimmed
-  }
-
-  if (error instanceof Error) {
-    return parse(error.message)
-  }
-
-  if (typeof error === 'string') {
-    return parse(error)
-  }
-
-  return parse(String(error))
+// 优化：使用统一的错误处理器
+const extractErrorMessage = (error: unknown, context?: string): string => {
+  return handleGlobalError(error, context)
 }
 
 const ensurePathExists = async (path: string, label: string) => {
   try {
     const exists = await PathExists(path)
     if (!exists) {
-      statusMessage.value = `${label} 不存在，请检查喵～`
+      statusMessage.value = `${label}${VALIDATION_MESSAGES.PATH_NOT_EXIST_SUFFIX}`
       isError.value = true
       return false
     }
@@ -59,13 +36,13 @@ const ensurePathExists = async (path: string, label: string) => {
 
 const handleSubmit = async () => {
   if (!projectPath.value || !configPath.value) {
-    statusMessage.value = '请输入完整的两个路径喵～'
+    statusMessage.value = VALIDATION_MESSAGES.EMPTY_PATHS
     isError.value = true
     return
   }
 
   if (!CONFIG_PATH_PATTERN.test(configPath.value)) {
-    statusMessage.value = '配置目录路径包含不支持的特殊字符喵～'
+    statusMessage.value = VALIDATION_MESSAGES.INVALID_CONFIG_PATH
     isError.value = true
     return
   }
@@ -73,11 +50,11 @@ const handleSubmit = async () => {
   statusMessage.value = ''
   isError.value = false
 
-  if (!(await ensurePathExists(projectPath.value, 'IntelliJ 安装路径'))) {
+  if (!(await ensurePathExists(projectPath.value, PATH_LABELS.INTELLIJ_PATH))) {
     return
   }
 
-  if (!(await ensurePathExists(configPath.value, '配置目录'))) {
+  if (!(await ensurePathExists(configPath.value, PATH_LABELS.CONFIG_PATH))) {
     return
   }
 
@@ -98,7 +75,7 @@ const handleSubmit = async () => {
 
 const handleClear = async () => {
   if (!projectPath.value) {
-    statusMessage.value = '请输入 IntelliJ 路径'
+    statusMessage.value = VALIDATION_MESSAGES.EMPTY_INTELLIJ_PATH
     isError.value = true
     return
   }
@@ -106,7 +83,7 @@ const handleClear = async () => {
   statusMessage.value = ''
   isError.value = false
 
-  if (!(await ensurePathExists(projectPath.value, 'IntelliJ 安装路径'))) {
+  if (!(await ensurePathExists(projectPath.value, PATH_LABELS.INTELLIJ_PATH))) {
     return
   }
 
@@ -130,175 +107,69 @@ const handleClear = async () => {
   <main class="workspace">
     <section class="panel panel--path">
       <header class="panel__header">
-        <h2 class="panel__title">安装路径</h2>
-        <p class="panel__description">
-          指向 IntelliJ 的安装目录，后续所有动作都会以这里为基准喵。
-        </p>
+        <h2 class="panel__title">{{ $t('mainView.installPath.title') }}</h2>
       </header>
-      <label class="field field--stack">
-        <span class="field__label">IntelliJ 安装目录</span>
-        <input
-          v-model.trim="projectPath"
-          class="input"
-          type="text"
-          autocomplete="off"
-          placeholder="例如：D:/Program Files/JetBrains/IntelliJ IDEA 2024.2"
-        />
-      </label>
+      <div class="panel__body">
+        <label class="field field--inline">
+          <span class="field__label">{{ $t('mainView.installPath.label') }}</span>
+          <input
+            v-model.trim="projectPath"
+            class="input"
+            type="text"
+            autocomplete="off"
+            :placeholder="$t('mainView.installPath.placeholder')"
+          />
+        </label>
+        <label class="field field--inline">
+          <span class="field__label">{{ $t('mainView.applyConfig.label') }}</span>
+          <input
+            v-model.trim="configPath"
+            class="input"
+            type="text"
+            autocomplete="off"
+            :placeholder="$t('mainView.applyConfig.placeholder')"
+          />
+        </label>
+      </div>
     </section>
 
     <section class="actions-grid">
       <form class="panel panel--action" @submit.prevent="handleSubmit">
-        <header class="panel__header">
-          <h2 class="panel__title">应用配置</h2>
-          <p class="panel__description">
-            选择需要导入的配置目录，浮浮酱会把它融合进上方的 IntelliJ 路径喵。
-          </p>
-        </header>
-        <div class="panel__body">
-          <label class="field field--stack">
-            <span class="field__label">配置目录</span>
-            <input
-              v-model.trim="configPath"
-              class="input"
-              type="text"
-              autocomplete="off"
-              placeholder="例如：D:/jetbra"
-            />
-          </label>
-        </div>
-        <footer class="panel__footer">
+        <footer class="panel__footer panel__footer--actions">
           <button class="button button--primary" type="submit" :disabled="submitting || clearing">
-            {{ submitting ? '提交中...' : '应用配置' }}
+            {{ submitting ? $t('mainView.applyConfig.submitting') : $t('mainView.applyConfig.submitButton') }}
           </button>
-        </footer>
-      </form>
-
-      <article class="panel panel--action">
-        <header class="panel__header">
-          <h2 class="panel__title">清除配置</h2>
-          <p class="panel__description">
-            恢复 IntelliJ 为初始状态，只会动到上方路径对应的配置喵。
-          </p>
-        </header>
-        <div class="panel__body panel__body--compact">
-          <p class="note">
-            当前路径：
-            <span class="note__value">{{ projectPath || '尚未填写' }}</span>
-          </p>
-        </div>
-        <footer class="panel__footer">
           <button
             class="button button--danger"
             type="button"
             :disabled="submitting || clearing"
             @click="handleClear"
           >
-            {{ clearing ? '清除中...' : '清除配置' }}
+            {{ clearing ? $t('mainView.clearConfig.clearing') : $t('mainView.clearConfig.clearButton') }}
           </button>
         </footer>
-      </article>
+      </form>
     </section>
 
-    <p v-if="statusMessage" :class="['feedback', isError ? 'feedback--error' : 'feedback--success']">
+    <p
+      v-if="statusMessage"
+      :class="['feedback', isError ? 'feedback--error' : 'feedback--success']"
+    >
       {{ statusMessage }}
     </p>
 
     <section class="panel panel--notice panel--warning">
-      <p class="notice-text">
-        若上述操作未成功，请下载压缩包后进入 <code>scripts</code> 文件夹按操作系统执行下列脚本喵：
-      </p>
+      <p class="notice-text" v-html="$t('mainView.notice.text')"></p>
       <ul class="notice-list">
-        <li>Windows：运行 <code>uninstall-all-users.vbs</code> 与 <code>uninstall-current-user.vbs</code></li>
-        <li>Linux / macOS：运行 <code>uninstall.sh</code></li>
+        <li v-html="$t('mainView.notice.windows')"></li>
+        <li v-html="$t('mainView.notice.linuxMac')"></li>
       </ul>
     </section>
   </main>
 </template>
 
 <style scoped>
-.workspace {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding: var(--space-xl) var(--space-lg);
-  -webkit-app-region: no-drag;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.workspace::-webkit-scrollbar {
-  display: none;
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding: calc(var(--space-md) + 0.2rem) var(--space-lg);
-  border-radius: 14px;
-  background: var(--color-surface);
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.32);
-  border: 1px solid var(--color-border);
-  backdrop-filter: blur(12px);
-}
-
-.panel--path {
-  border-color: var(--color-border-strong);
-}
-
-.panel--action {
-  justify-content: space-between;
-}
-
-.panel--notice {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.panel--warning {
-  background: rgba(255, 161, 76, 0.15);
-  border-color: rgba(255, 191, 120, 0.35);
-}
-
-.panel__header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.panel__title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.panel__description {
-  font-size: 0.85rem;
-  color: var(--color-muted);
-}
-
-.panel__body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.panel__body--compact {
-  gap: var(--space-sm);
-}
-
-.panel__footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.actions-grid {
-  display: grid;
-  gap: var(--space-lg);
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
+/* 组件特定样式 - 公共样式已移至 global.css */
 
 .field {
   display: flex;
@@ -311,6 +182,22 @@ const handleClear = async () => {
   width: 100%;
 }
 
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.field--inline .field__label {
+  width: 140px;
+  text-align: right;
+  margin-bottom: 0;
+}
+
+.field--inline .input {
+  flex: 1;
+}
+
 .field__label {
   font-weight: 600;
   color: var(--color-text);
@@ -319,23 +206,29 @@ const handleClear = async () => {
 .input {
   padding: 0.65rem 0.75rem;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(12, 24, 38, 0.88);
+  border: 1px solid var(--color-border);
+  background: var(--input-background);
   color: inherit;
   font-size: 0.875rem;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
 .input:hover {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(12, 24, 38, 0.95);
+  border-color: var(--color-border-strong);
+  background: var(--input-background-hover);
+  transform: translateY(-1px);
 }
 
 .input:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(66, 184, 131, 0.18);
-  background: rgba(12, 24, 38, 1);
+  background: var(--input-background-focus);
+  transform: translateY(-1px);
 }
 
 .button {
@@ -346,28 +239,40 @@ const handleClear = async () => {
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease,
+    border-color 0.2s ease;
   color: #fff;
 }
 
 .button--primary {
   background: linear-gradient(135deg, var(--color-accent), var(--color-accent-strong));
-  box-shadow: 0 12px 24px rgba(45, 136, 255, 0.35);
+  box-shadow: var(--shadow-primary);
 }
 
 .button--primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(45, 136, 255, 0.45);
+  box-shadow: var(--shadow-primary-hover);
+}
+
+.button--primary:active {
+  transform: translateY(0);
 }
 
 .button--danger {
   background: linear-gradient(135deg, var(--color-danger), #ff7b84);
-  box-shadow: 0 12px 24px rgba(238, 90, 111, 0.35);
+  box-shadow: var(--shadow-danger);
 }
 
 .button--danger:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 30px rgba(238, 90, 111, 0.45);
+  box-shadow: var(--shadow-danger-hover);
+}
+
+.button--danger:active {
+  transform: translateY(0);
 }
 
 .button:disabled {
@@ -377,20 +282,10 @@ const handleClear = async () => {
   box-shadow: none;
 }
 
-.note {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  color: var(--color-muted);
-  font-size: 0.85rem;
-}
-
-.note__value {
-  font-family: 'Cascadia Code', 'Fira Code', 'Courier New', monospace;
-  background: rgba(12, 24, 38, 0.75);
-  padding: 0.25rem 0.45rem;
-  border-radius: 8px;
-  color: #9de3ff;
+.panel__footer--actions {
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .feedback {
@@ -399,26 +294,26 @@ const handleClear = async () => {
   padding: 0.8rem 1rem;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-feedback);
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 500;
 }
 
 .feedback--success {
-  color: #8ef5c3;
-  border-color: rgba(142, 245, 195, 0.25);
-  background: rgba(66, 184, 131, 0.12);
+  color: var(--feedback-success-color);
+  border-color: var(--feedback-success-border);
+  background: var(--feedback-success-bg);
 }
 
 .feedback--error {
-  color: #ffb8b0;
-  border-color: rgba(255, 184, 176, 0.25);
-  background: rgba(255, 107, 107, 0.12);
+  color: var(--feedback-error-color);
+  border-color: var(--feedback-error-border);
+  background: var(--feedback-error-bg);
 }
 
 .notice-text {
   font-size: 0.85rem;
-  color: rgba(255, 230, 200, 0.9);
+  color: var(--warning-text);
 }
 
 .notice-list {
@@ -427,19 +322,12 @@ const handleClear = async () => {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  color: rgba(255, 235, 210, 0.9);
+  color: var(--warning-text-alt);
   font-size: 0.85rem;
 }
 
+/* 组件特定的响应式样式 */
 @media (max-width: 640px) {
-  .workspace {
-    padding: var(--space-lg);
-  }
-
-  .panel {
-    padding: var(--space-md);
-  }
-
   .button {
     width: 100%;
     justify-content: center;

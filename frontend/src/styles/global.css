@@ -3,6 +3,122 @@ body,
 #app {
   height: 100%;
   margin: 0;
-  background-color: #09111d;
+  /* 使用 background 简写属性以支持渐变背景图片 */
+  background: var(--gradient-background);
+  background-attachment: fixed; /* 确保背景固定，不随内容滚动 */
+  background-size: cover;
+  color: var(--color-text);
   overflow: hidden;
+}
+
+/* ==========================================
+   公共组件样式 - 从 MainView 和 AboutView 提取
+   优化：遵循 DRY 原则，避免样式重复
+   ========================================== */
+
+/* 工作区容器 */
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-xl) var(--space-lg);
+  -webkit-app-region: no-drag;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.workspace::-webkit-scrollbar {
+  display: none;
+}
+
+/* 面板样式 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: calc(var(--space-md) + 0.2rem) var(--space-lg);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-panel), 0 12px 28px rgba(0, 0, 0, 0.12);
+  background: var(--panel-background-hover);
+}
+
+.panel--path {
+  border-color: var(--color-border-strong);
+}
+
+.panel--action {
+  justify-content: space-between;
+}
+
+.panel--notice {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.panel--warning {
+  background: rgba(255, 161, 76, 0.15);
+  border-color: rgba(255, 191, 120, 0.35);
+}
+
+/* 面板头部 */
+.panel__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.panel__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.panel__description {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+/* 面板主体 */
+.panel__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.panel__body--compact {
+  gap: var(--space-sm);
+}
+
+/* 面板底部 */
+.panel__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 操作网格 */
+.actions-grid {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* 响应式设计 */
+@media (max-width: 640px) {
+  .workspace {
+    padding: var(--space-lg);
+  }
+
+  .panel {
+    padding: var(--space-md);
+  }
 }
