@@ -221,6 +221,17 @@ jobs:
           task darwin:create:app:bundle
           mv bin/intellijapp.app bin/intellijapp-amd64.app
 
+      - name: Remove macOS quarantine attributes
+        if: runner.os == 'macOS'
+        run: |
+          # Remove quarantine attributes from .app bundles
+          if [ -d "bin/intellijapp-arm64.app" ]; then
+            xattr -dr com.apple.quarantine bin/intellijapp-arm64.app || true
+          fi
+          if [ -d "bin/intellijapp-amd64.app" ]; then
+            xattr -dr com.apple.quarantine bin/intellijapp-amd64.app || true
+          fi
+
       - name: Rename macOS packages
         if: runner.os == 'macOS'
         run: |
@@ -229,26 +240,20 @@ jobs:
 
           cd bin
 
-          # Copy install script to package directory and make it executable
-          if [ -f "../install.sh" ]; then
-            cp ../install.sh .
-            chmod +x install.sh
-          fi
-
-          # Zip arm64 version with install script
+          # Zip arm64 version
           if [ -d "intellijapp-arm64.app" ]; then
-            zip -r "intellijapp-${VERSION}-darwin-arm64.app.zip" intellijapp-arm64.app install.sh
+            zip -r "intellijapp-${VERSION}-darwin-arm64.app.zip" intellijapp-arm64.app
             rm -rf intellijapp-arm64.app
           fi
 
-          # Zip amd64 version with install script
+          # Zip amd64 version
           if [ -d "intellijapp-amd64.app" ]; then
-            zip -r "intellijapp-${VERSION}-darwin-amd64.app.zip" intellijapp-amd64.app install.sh
+            zip -r "intellijapp-${VERSION}-darwin-amd64.app.zip" intellijapp-amd64.app
             rm -rf intellijapp-amd64.app
           fi
 
-          # Clean up temporary files
-          rm -f intellijapp intellijapp-amd64 intellijapp-arm64 install.sh
+          # Clean up temporary binary files
+          rm -f intellijapp intellijapp-amd64 intellijapp-arm64
 
           cd ..
 
